@@ -1,7 +1,7 @@
 ThreeAudio.js
 ==========
 
-![ThreeAudio.js](https://raw.github.com/unconed/GLAudio.js/master/glaudio.png)
+![ThreeAudio.js](https://raw.github.com/unconed/ThreeAudio.js/master/misc/ThreeAudio.png)
 
 
 ThreeAudio helps you create music visualizations in Three.js.
@@ -42,7 +42,6 @@ var audioMaterial = new ThreeAudio.Material(audioTextures, vertexShader, fragmen
 var geometry = new ThreeAudio.GridGeometry(audioTextures, 100, 100);
 // OR: 16 frequency/time samples and 5 history samples
 var geometry = new ThreeAudio.GridGeometry(audioTextures, 100, 100, 16, 5);
-
 // Mesh
 var audioMesh = new THREE.Mesh(geometry, audioMaterial);
 scene.add(audioMesh);
@@ -68,7 +67,7 @@ Note: the textures are automatically update on render. The chained calls above g
 Shaders
 -------
 
-See `shaders/shaders.html` for an example shader that generates a 3d spectrum voiceprint.
+See `shaders/shaders.glsl.html` for an example shader that generates a 3d spectrum voiceprint.
 
 
 * * *
