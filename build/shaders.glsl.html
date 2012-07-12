@@ -1,0 +1,69 @@
+<!-- audio material shader -->
+<script type="application/x-glsl" id="vis-vertex">
+
+// Audio data textures
+uniform sampler2D freqData;
+uniform sampler2D timeData;
+
+// Offset and sample size for sampling data textures
+uniform float audioOffset;
+uniform vec2 audioStep;
+
+// Precalculated audio levels, the components being (all, bass, mid, treble).
+// Contains raw levels, smoothed levels and instantaneous change in levels.
+uniform float audioLevels[4];
+uniform float audioLevelsSmooth[4];
+uniform float audioLevelsChange[4];
+
+// Pass UVs into fragment shader
+varying vec2 vUV;
+varying vec2 vAudioUV;
+
+void main() {
+  // Calculate correct UV offset for sampling cyclic audio buffer.
+  vec2 audioUV = vec2(uv.x, uv.y + audioOffset);
+  vUV = uv;
+
+  // Render time data on a grid.
+  vec3 pos = vec3(
+    position.x,
+    position.y + texture2D(timeData, audioUV).a * 1.0 - .5,
+    position.z);
+
+  // Pass correct UV offset to fragment shader.
+  vAudioUV = audioUV;
+
+  // Project vertex into screen space.
+  gl_Position = projectionMatrix *
+                modelViewMatrix *
+                vec4(pos, 1.0);
+}
+</script>
+
+<script type="application/x-glsl" id="vis-fragment">
+
+// Audio data textures
+uniform sampler2D freqData;
+uniform sampler2D timeData;
+
+// Offset and sample size for sampling data textures
+uniform float audioOffset;
+uniform vec2 audioStep;
+
+// Precalculated audio levels, the components being (all, bass, mid, treble).
+// Contains raw levels, smoothed levels and instantaneous change in levels.
+uniform float audioLevels[4];
+uniform float audioLevelsSmooth[4];
+uniform float audioLevelsChange[4];
+
+// Pass UVs into fragment shader
+varying vec2 vUV;
+varying vec2 vAudioUV;
+
+void main() {
+  float alpha = texture2D(timeData, vAudioUV).a * 2.0 - .5;
+  vec4 color = vec4(vUV.x, vUV.y * alpha, alpha, 1.0);
+
+  gl_FragColor = color;
+}
+</script>
