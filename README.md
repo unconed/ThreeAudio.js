@@ -4,7 +4,7 @@ ThreeAudio.js
 ![ThreeAudio.js](https://raw.github.com/unconed/ThreeAudio.js/master/misc/ThreeAudio.png)
 
 
-ThreeAudio helps you create music visualizations in Three.js.
+ThreeAudio helps you create music visualizations in Three.js, by exposing audio data in GLSL shaders.
 
 It can be used directly with Three.js or as a tQuery plug-in.
 
