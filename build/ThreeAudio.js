@@ -100,7 +100,7 @@ MicroEvent.mixin	= function(destObject){
 	}
 }
 ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 1024;
+  this.fftSize = fftSize || 512;
 
   this.filters = {};
   this.playing = false;
@@ -353,7 +353,6 @@ ThreeAudio.Textures = function (renderer, source, history) {
   this.renderer = renderer;
   this.source = source;
   this.textures = {};
-  this.materials = [];
 
   this.history = history || 128;
   this.timeIndex = 0;

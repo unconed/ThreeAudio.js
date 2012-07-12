@@ -9,7 +9,6 @@ src/Source.js
 src/Material.js
 src/Textures.js
 src/GridGeometry.js
-src/Preload.js
 "
 
 TQUERY="

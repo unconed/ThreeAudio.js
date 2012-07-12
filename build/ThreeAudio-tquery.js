@@ -100,7 +100,7 @@ MicroEvent.mixin	= function(destObject){
 	}
 }
 ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 1024;
+  this.fftSize = fftSize || 512;
 
   this.filters = {};
   this.playing = false;
@@ -353,7 +353,6 @@ ThreeAudio.Textures = function (renderer, source, history) {
   this.renderer = renderer;
   this.source = source;
   this.textures = {};
-  this.materials = [];
 
   this.history = history || 128;
   this.timeIndex = 0;
@@ -526,14 +525,20 @@ ThreeAudio.GridGeometry = function (textures, width, depth, segmentsW, segmentsH
 /**
  * Create an audio source.
  */
-tQuery.register('createAudio', function (fftSize) {
+tQuery.World.register('audio', function (fftSize) {
+  return tQuery.createAudioSource(this, fftSize);
+});
+
+/**
+ * Create an audio source.
+ */
+tQuery.register('createAudioSource', function (world, fftSize) {
   // Create source
-  var world = this;
   var source = new ThreeAudio.Source(fftSize);
 
   // Add .textures() method.
   source.textures = function (history) {
-    return world.createAudioTextures(this, history);
+    return tQuery.createAudioTextures(world, this, history);
   };
 
   return source;
@@ -542,18 +547,22 @@ tQuery.register('createAudio', function (fftSize) {
 /**
  * Create a set of audio textures for sound data.
  */
-tQuery.register('createAudioTextures', function (source, history) {
-  var world = this;
-  var textures = new ThreeAudio.Textures(this._renderer, source, history);
+tQuery.register('createAudioTextures', function (world, source, history) {
+  var audioTextures = new ThreeAudio.Textures(world.tRenderer(), source, history);
 
   // Add .material() method.
-  textures.material = function (vertexShader, fragmentShader, textures,
+  audioTextures.material = function (vertexShader, fragmentShader, textures,
                                 uniforms, attributes) {
-    return world.createAudioMaterial(this, vertexShader, fragmentShader, textures,
+    return tQuery.createAudioMaterial(this, vertexShader, fragmentShader, textures,
                                      uniforms, attributes);
   };
 
-  return textures;
+  // Auto-update textures before render.
+  world.loop().hookPreRender(function () {
+    audioTextures.update();
+  });
+
+  return audioTextures;
 });
 
 /**
@@ -561,8 +570,6 @@ tQuery.register('createAudioTextures', function (source, history) {
  */
 tQuery.register('createAudioMaterial',
   function (audioTextures, vertexShader, fragmentShader, textures, uniforms, attributes) {
-    var world = this;
-
     var material = new ThreeAudio.Material(
       audioTextures,
       vertexShader,
@@ -574,7 +581,7 @@ tQuery.register('createAudioMaterial',
 
     // Add .grid() method.
     material.grid = function (width, height, segmentsW, segmentsH) {
-      return world.createAudioGrid(audioTextures, width, height, segmentsW, segmentsH, this);
+      return tQuery.createAudioGrid(audioTextures, width, height, segmentsW, segmentsH, this);
     };
 
     return material;
@@ -586,6 +593,11 @@ tQuery.register('createAudioMaterial',
  */
 tQuery.register('createAudioGrid', function (textures) {
 	var ctor	= ThreeAudio.GridGeometry;
-	var dflGeometry	= [textures, 1, 1, 0, 0];
-	return this._createMesh(ctor, dflGeometry, arguments)
+
+	var defaults	= [textures, 1, 1, 0, 0];
+	for (i in defaults) {
+	  arguments[i] = arguments[i] || defaults[i];
+	}
+
+	return this._createMesh(ctor, defaults, arguments);
 });
