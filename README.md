@@ -12,7 +12,7 @@ ThreeAudio will read from an audio source and provide frequency/time data in the
 
 Includes: microevent.js (Jerome Etienne)
 
-*NOTE: ThreeAudio is still somewhat experimental and only Webkit Audio APIs are supported. Patches are welcome.*
+*NOTE: ThreeAudio is still somewhat experimental and only Webkit Audio APIs are supported for now. Patches are welcome.*
 
 Builds:
 
