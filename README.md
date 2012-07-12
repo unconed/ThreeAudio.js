@@ -77,7 +77,7 @@ Create audio textures, make a material out of them with given shaders, and bind 
 var mesh = audio.textures().material(vertexShader, fragmentShader).grid().addTo(world);
 ```
 
-Note: the textures are automatically update on render. The chained calls above give you access to the intermediate ThreeAudio objects in between.
+Note: the textures are automatically updated on render. The chained calls above give you access to the intermediate ThreeAudio objects in between.
 
 Shaders
 -------
