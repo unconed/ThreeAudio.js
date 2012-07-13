@@ -14,6 +14,8 @@ Includes: microevent.js (Jerome Etienne)
 
 *NOTE: ThreeAudio is still somewhat experimental and only Webkit Audio APIs are supported for now. Patches are welcome.*
 
+Demo (Chrome only!): [http://acko.net/files/three-audio/](http://acko.net/files/three-audio/)
+
 Builds:
 
  * ThreeAudio: microevent + core
