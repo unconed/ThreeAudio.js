@@ -423,14 +423,13 @@ ThreeAudio.Textures.prototype = {
         var s = (data[i] - 128) / 128;
         accum += s*s;
       }
-      return accum / size;
+      return Math.sqrt(accum / size);
     }
 
     // Calculate energy level for all bins.
     var waveforms = [data.time, data.filter.bass, data.filter.mid, data.filter.treble];
     for (var j = 0; j < 4; ++j) {
-      // Apply square root for compression, evens out response.
-      bins[j] = Math.sqrt(rms(waveforms[j]));
+      bins[j] = rms(waveforms[j]);
     }
 
     // Keep 7 last level values
