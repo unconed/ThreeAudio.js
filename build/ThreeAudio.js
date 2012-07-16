@@ -218,26 +218,27 @@ ThreeAudio.Source.prototype = {
 
   load: function (url, callback) {
     var context = this.context,
-        source = this.source;
+        source = this.source,
+        that = this;
 
     // Load file via AJAX
     var request = new XMLHttpRequest();
     request.open("GET", url, true);
     request.responseType = "arraybuffer";
 
-    request.onload = (function() {
+    request.onload = function() {
       // Link databuffer to source
       var buffer = context.createBuffer(request.response, false);
       source.buffer = buffer;
       source.loop = true;
 
       // Begin playback if requested earlier.
-      if (this.playing) {
-        this._play();
+      if (that.playing) {
+        that._play();
       }
 
       callback && callback();
-    }).bind(this);
+    };
 
     request.send();
 

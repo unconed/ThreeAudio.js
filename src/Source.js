@@ -125,7 +125,7 @@ ThreeAudio.Source.prototype = {
     request.open("GET", url, true);
     request.responseType = "arraybuffer";
 
-    request.onload = (function() {
+    request.onload = function() {
       // Link databuffer to source
       var buffer = context.createBuffer(request.response, false);
       source.buffer = buffer;
