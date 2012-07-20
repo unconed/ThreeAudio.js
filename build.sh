@@ -9,6 +9,8 @@ src/Source.js
 src/Material.js
 src/Textures.js
 src/GridGeometry.js
+src/LevelDetect.js
+src/BeatDetect.js
 "
 
 TQUERY="

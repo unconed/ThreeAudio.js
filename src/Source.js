@@ -1,5 +1,5 @@
 ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 512;
+  this.fftSize = fftSize || 1024;
 
   this.filters = {};
   this.playing = false;
@@ -17,7 +17,7 @@ ThreeAudio.Source.prototype = {
 
     // Create main analyser
     this.analyser = c.createAnalyser();
-    this.analyser.fftSize = this.fftSize;
+    var fftSize = this.analyser.fftSize = this.fftSize;
 
     // Create filter nodes for bass/mid/treble signals.
     var parameters = {
@@ -29,7 +29,7 @@ ThreeAudio.Source.prototype = {
       },
       mid: {
         type: 2, // BANDPASS
-        frequency: 400,
+        frequency: 500,
         Q: 1.2,
         gain: 4.0//,
       },
@@ -50,13 +50,11 @@ ThreeAudio.Source.prototype = {
 
       // Create analyser for filtered signal.
       filter.analyser = c.createAnalyser();
-      filter.analyser.fftSize = 512;
+      filter.analyser.fftSize = fftSize;
 
-      // Create delay node to compensate for fftSize difference/lag
-      // Note: disabled, Texture.js signal smoothing ends up adding enough filter delay to compensate.
+      // Create delay node to compensate for FFT lag.
       filter.delayNode = c.createDelayNode();
-      filter.delayNode.delayTime.value = 0;
-      //*(this.fftSize - 512) / c.sampleRate;
+      filter.delayNode.delayTime.value = this.fftSize * 2 / c.sampleRate;
 
       // Create gain node to offset filter loss.
       filter.gainNode = c.createGainNode();
@@ -88,25 +86,45 @@ ThreeAudio.Source.prototype = {
     this.data = {
       // High resolution FFT for frequency / time data
       freq: new Uint8Array(this.samples),
-      time: new Uint8Array(this.samples),
+      time: new Uint8Array(this.samples * 2),
       // Low resolution filtered signals, time data only.
       filter: {
-        bass: new Uint8Array(256),
-        mid: new Uint8Array(256),
-        treble: new Uint8Array(256)//,
+        bass: new Uint8Array(this.samples * 2),
+        mid: new Uint8Array(this.samples * 2),
+        treble: new Uint8Array(this.samples * 2)//,
       }//,
     };
+
+    // Create levels detector
+    this.levelDetect = new ThreeAudio.LevelDetect(this.data);
+
+    // Create beat detector
+    this.beatDetect = new ThreeAudio.BeatDetect(this.data);
   },
 
   update: function () {
     var a = this.analyser, d = this.data;
+
+    this.ii = (this.ii || 0) + 1;
+    if (this.ii == 100) {
+      console.log(this.data.filter.bass);
+    }
+
+    // Get freq/time data.
     a.smoothingTimeConstant = 0;
     a.getByteFrequencyData(d.freq);
     a.getByteTimeDomainData(d.time);
 
+    // Get filtered signals.
     _.each(this.filters, function (filter) {
       filter.analyser.getByteTimeDomainData(d.filter[filter.key]);
     });
+
+    // Update level detector.
+    this.levelDetect.analyse();
+
+    // Update beat detector.
+    this.beatDetect.analyse();
 
     return this;
   },
