@@ -8,15 +8,15 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   uniforms = _.extend(uniforms || {}, {
     audioLevels: {
       type: 'fv1',
-      value: 0//,
+      value: [0,0,0,0]//,
     },
     audioLevelsSmooth: {
       type: 'fv1',
-      value: 0//,
+      value: [0,0,0,0]//,
     },
     audioLevelsChange: {
       type: 'fv1',
-      value: 0//,
+      value: [0,0,0,0]//,
     },
     audioOffset: {
       type: 'f',
@@ -58,7 +58,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
     uniforms[key] = {
       type: 't',
       value: i++,
-      texture: texture//,
+      texture: ThreeAudio.toTexture(texture)//,
     };
   });
 

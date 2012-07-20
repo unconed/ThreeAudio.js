@@ -169,3 +169,6 @@ ThreeAudio.Source.prototype = {
   }//,
 
 };
+
+// tQuery-like naming.
+ThreeAudio.Source.prototype.start = ThreeAudio.Source.prototype.play;

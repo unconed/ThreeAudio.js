@@ -67,13 +67,25 @@ tQuery.register('createAudioMaterial',
 /**
  * Create an audio grid for rendering sound data with.
  */
-tQuery.register('createAudioGrid', function (textures) {
-	var ctor	= ThreeAudio.GridGeometry;
+tQuery.register('createAudioGrid', function (textures, width, depth, segmentsW, segmentsH, material) {
+  var defaults  = [textures, 1, 1, 0, 0];
+  for (i in defaults) {
+    arguments[i] = arguments[i] || defaults[i];
+  }
 
-	var defaults	= [textures, 1, 1, 0, 0];
-	for (i in defaults) {
-	  arguments[i] = arguments[i] || defaults[i];
-	}
+  var geometry = new ThreeAudio.GridGeometry(
+    textures,
+    width || 1,
+    depth || 1,
+    segmentsW,
+    segmentsH
+  );
 
-	return this._createMesh(ctor, defaults, arguments);
+  var material = material || tQuery.defaultObject3DMaterial;
+
+  var mesh = new THREE.Mesh(geometry, material);
+  mesh.doubleSided = true;
+  mesh.frustumCulled = false;
+
+  return tQuery(mesh);
 });

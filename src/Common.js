@@ -50,3 +50,8 @@ MicroEvent.mixin	= function(destObject){
 		destObject.prototype[props[i]]	= MicroEvent.prototype[props[i]];
 	}
 }
+
+// Compatibility with ThreeRTT/ThreeBox
+ThreeAudio.toTexture = function (texture) {
+  return (ThreeRTT && ThreeRTT.toTexture && ThreeRTT.toTexture(texture)) || texture;
+}
