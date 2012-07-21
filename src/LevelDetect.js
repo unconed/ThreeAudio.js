@@ -12,7 +12,7 @@ ThreeAudio.LevelDetect = function (data) {
   data.levels = {
     direct: this.levels[0],
     smooth: this.smooth,
-    change: this.change,
+    change: this.change//,
   };
 };
 

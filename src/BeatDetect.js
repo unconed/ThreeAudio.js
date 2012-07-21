@@ -2,7 +2,7 @@
  * Audio analyser: provide beat detection
  *
  * It works in two stages:
- * - Uses autocorrelation of the signal to find the BPM.
+ * - Uses autocorrelation of the RMS of the signal over time to find the BPM.
  * - Uses energy detection to find major beats, and predicts missing beats using the BPM.
  *
  * The autocorrelation helps figure out complicated drum patterns,
@@ -21,6 +21,8 @@
  * and it tries to find the beat again.
  *
  * Kinda crappy for anything but 4/4 house.
+ *
+ * Uses the levels of LevelDetect as input.
  */
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
