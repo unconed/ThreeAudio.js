@@ -606,6 +606,8 @@ ThreeAudio.LevelDetect.prototype.analyse = function () {
  * and it tries to find the beat again.
  *
  * Kinda crappy for anything but 4/4 house.
+ *
+ * Uses the levels of LevelDetect as input.
  */
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
@@ -622,7 +624,7 @@ ThreeAudio.BeatDetect = function (data) {
     bpm: 0//,
   };
 
-  this.initDebug();
+  //this.initDebug();
 
   // Sample buffers
   this.n = 512;
