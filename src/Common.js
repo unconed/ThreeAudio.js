@@ -55,3 +55,7 @@ MicroEvent.mixin	= function(destObject){
 ThreeAudio.toTexture = function (texture) {
   return (ThreeRTT && ThreeRTT.toTexture && ThreeRTT.toTexture(texture)) || texture;
 }
+
+// Math!
+var π = Math.PI,
+    τ = π * 2;

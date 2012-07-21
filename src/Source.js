@@ -1,5 +1,5 @@
 ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 1024;
+  this.fftSize = fftSize || 2048;
 
   this.filters = {};
   this.playing = false;
@@ -86,12 +86,12 @@ ThreeAudio.Source.prototype = {
     this.data = {
       // High resolution FFT for frequency / time data
       freq: new Uint8Array(this.samples),
-      time: new Uint8Array(this.samples * 2),
+      time: new Uint8Array(this.samples),
       // Low resolution filtered signals, time data only.
       filter: {
-        bass: new Uint8Array(this.samples * 2),
-        mid: new Uint8Array(this.samples * 2),
-        treble: new Uint8Array(this.samples * 2)//,
+        bass: new Uint8Array(this.samples),
+        mid: new Uint8Array(this.samples),
+        treble: new Uint8Array(this.samples)//,
       }//,
     };
 
@@ -104,11 +104,6 @@ ThreeAudio.Source.prototype = {
 
   update: function () {
     var a = this.analyser, d = this.data;
-
-    this.ii = (this.ii || 0) + 1;
-    if (this.ii == 100) {
-      console.log(this.data.filter.bass);
-    }
 
     // Get freq/time data.
     a.smoothingTimeConstant = 0;
