@@ -39,7 +39,7 @@ ThreeAudio.BeatDetect = function (data) {
     bpm: 0//,
   };
 
-  //this.initDebug();
+  this.initDebug();
 
   // Sample buffers
   this.n = 512;
@@ -439,6 +439,21 @@ ThreeAudio.BeatDetect.prototype = {
     var n = this.n;
 
     if (this.g) {
+      // Mark histogram beats according to active BPM.
+      if (this.beat) {
+        var reference = this.beat;
+        var cutoff = reference.offset * 1.5;
+        _.each(histogram, function (peak) {
+          var match = (peak == reference ? 1 : 0);
+          if (peak.offset > cutoff) {
+            // Calculate match value based on narrow window around integer ratios.
+            var ratio = peak.offset / reference.offset;
+            match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
+          }
+          peak.match = match;
+        });
+      }
+
       var out = [ '<strong>' + Math.round(beat.bpm * 10) / 10 + ' BPM (' + (Math.round(100 * beat.confidence)) + '%) ' + Math.round(beat.permanence * 100) + '</strong>' ];
       _.each(histogram, function (peak) {
         var bpm = Math.round(that.offsetToBPM(peak.offset) * 10) / 10;
@@ -468,9 +483,9 @@ ThreeAudio.BeatDetect.prototype = {
 
       // Highlight peaks
       _.each(histogram, function (peak) {
-        var alpha = peak.strength *.5 + .5;
-        var active = peak.active ? '255' : '0';
-        g.fillStyle = 'rgba(255,'+active+',0,'+ alpha +')';
+        var alpha = peak.strength *.75 + .25;
+        var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(200 + 20 * peak.match), 0].join(',') : '255,10,10';
+        g.fillStyle = 'rgba('+color+','+ alpha +')';
         g.fillRect((peak.offset - 2) * 8, 140, 1, 100);
       })
 
@@ -491,8 +506,8 @@ ThreeAudio.BeatDetect.prototype = {
       // Show beats
       if (beat.is) {
         g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
-                      : (beat.predicted ? 'rgba(255,180,0,.5)' : 'rgba(30,180,0,.5)');
-        g.fillRect(this.i, 0, 1, 100)
+                      : (beat.predicted ? 'rgba(255,200,0,.75)' : 'rgba(60,220,0,.75)');
+        g.fillRect(this.i, 0, 2, 100)
       }
       var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
       g.fillStyle = 'rgb('+c+','+c+','+c+')';
@@ -500,28 +515,28 @@ ThreeAudio.BeatDetect.prototype = {
 
       // Show maybe beats
       if (beat.maybe) {
-        g.fillStyle = beat.predicted ? 'rgba(100,0,230,.5)' : 'rgba(0,180,255,.5)';
-        g.fillRect(this.i, 0, 1, 100)
+        g.fillStyle = beat.predicted ? 'rgba(64,64,64,.75)' : 'rgba(0,180,255,.75)';
+        g.fillRect(this.i, 0, 2, 100)
       }
 
       // Show sample
       if (sample) {
-        sample = Math.floor(Math.max(0, Math.min(1, sample)) * 255);
-        g.fillStyle = 'rgba(0,'+sample+',' + sample +',1)';
+        sample = Math.floor(Math.max(0, Math.min(1, sample*2)) * 255);
+        g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
         g.fillRect(this.i, 80, 1, 20)
       }
 
       // Show diff
       if (diff) {
-        diff = Math.floor(Math.max(0, Math.min(1, diff)) * 255);
-        g.fillStyle = 'rgba('+diff+',0,' + diff +',1)';
+        diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
+        g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
         g.fillRect(this.i, 100, 1, 20)
       }
 
       // Show maybe
       if (maybe) {
-        maybe = Math.floor(Math.max(0, Math.min(1, maybe)) * 255);
-        g.fillStyle = 'rgba('+maybe+',' + maybe +',0,1)';
+        maybe = Math.floor(Math.max(0, Math.min(1, maybe*2)) * 255);
+        g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
         g.fillRect(this.i, 120, 1, 20)
       }
 
