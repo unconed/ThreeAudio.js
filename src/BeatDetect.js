@@ -364,8 +364,8 @@ ThreeAudio.BeatDetect.prototype = {
             data.beat.is = true;
             if (offset == 0) data.beat.predicted = true;
             this.debouncePredict = 0;
-            this.missed = Math.max(0, this.missed - foundBonus);
           }
+          this.missed = Math.max(0, this.missed - foundBonus);
         }
         // Realign if there is a powerful enough impulse. Be more generous the more we've missed.
         else if (maybe > (1 - this.missed / maxPenalty)) {
@@ -484,7 +484,7 @@ ThreeAudio.BeatDetect.prototype = {
       // Highlight peaks
       _.each(histogram, function (peak) {
         var alpha = peak.strength *.75 + .25;
-        var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(200 + 20 * peak.match), 0].join(',') : '255,10,10';
+        var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(180 + 40 * peak.match), 0].join(',') : '255,10,10';
         g.fillStyle = 'rgba('+color+','+ alpha +')';
         g.fillRect((peak.offset - 2) * 8, 140, 1, 100);
       })
@@ -506,7 +506,7 @@ ThreeAudio.BeatDetect.prototype = {
       // Show beats
       if (beat.is) {
         g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
-                      : (beat.predicted ? 'rgba(255,200,0,.75)' : 'rgba(60,220,0,.75)');
+                      : (beat.predicted ? 'rgba(255,180,0,.75)' : 'rgba(60,220,0,.75)');
         g.fillRect(this.i, 0, 2, 100)
       }
       var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
