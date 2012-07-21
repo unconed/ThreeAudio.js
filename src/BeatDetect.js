@@ -27,6 +27,7 @@ ThreeAudio.BeatDetect = function (data) {
   this.spectrum = new Float32Array(this.n);
   this.fft = new FFT(this.n, 44100);
   this.energy = 0;
+  this.last = 0;
   this.measure = 0;
   this.sample = 0;
   this.debounceMaybe = 0;
@@ -290,8 +291,10 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Find energy impulse of bass to mark beginning of measure
     var energy = levels.direct[1] + levels.direct[3];
-    this.energy = this.energy + (energy - this.energy) * .2;
-    maybe = (energy - this.energy * 1.2);
+    var diff = (energy * 2 - this.last);
+    this.energy = this.energy + (diff - this.energy) * .2;
+    this.last = energy;
+    maybe = (diff - this.energy * 2);
 
     // Prepare beat data
     data.beat.maybe = false;
@@ -328,7 +331,7 @@ ThreeAudio.BeatDetect.prototype = {
             this.missed = Math.max(0, this.missed - 2);
           }
         }
-        else if (maybe > 0.4) {
+        else if (maybe > 0.8) {
           // Realign due to drop.
           this.measure = 0;
           data.beat.is = true;
@@ -379,12 +382,12 @@ ThreeAudio.BeatDetect.prototype = {
     this.measure++;
 
     //////////////
-    this.debug(levels.direct, sample, energy, maybe, spectrum, peaks, histogramSorted, data.beat);
+    this.debug(levels.direct, sample, diff, maybe, spectrum, peaks, histogramSorted, data.beat);
   },
 
 
   // Draw debug info into canvas / dom
-  debug: function (levels, sample, energy, maybe, spectrum, peaks, histogram, beat) {
+  debug: function (levels, sample, diff, maybe, spectrum, peaks, histogram, beat) {
     var that = this;
     var n = this.n;
 
@@ -460,10 +463,10 @@ ThreeAudio.BeatDetect.prototype = {
         g.fillRect(this.i, 80, 1, 20)
       }
 
-      // Show energy
-      if (energy) {
-        energy = Math.floor(Math.max(0, Math.min(1, energy)) * 255);
-        g.fillStyle = 'rgba('+energy+',0,' + energy +',1)';
+      // Show diff
+      if (diff) {
+        diff = Math.floor(Math.max(0, Math.min(1, diff)) * 255);
+        g.fillStyle = 'rgba('+diff+',0,' + diff +',1)';
         g.fillRect(this.i, 100, 1, 20)
       }
 
