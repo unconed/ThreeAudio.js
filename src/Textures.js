@@ -7,6 +7,8 @@ ThreeAudio.Textures = function (renderer, source, history) {
   this.history = history || 128;
   this.timeIndex = 0;
 
+  this.data = source.data;
+
   this.init();
 }
 
@@ -16,7 +18,7 @@ ThreeAudio.Textures.prototype = {
     var renderer = this.renderer,
         gl = renderer.getContext(),
         textures = this.textures,
-        source = this.source,
+        data = this.data,
         history = this.history,
         t, d, empty;
 
@@ -36,7 +38,7 @@ ThreeAudio.Textures.prototype = {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-      d = source.data[key];
+      d = data[key];
       empty = new Uint8Array(d.length * history);
       if (key == 'time') {
         for (var i = 0; i < d.length * history; ++i) empty[i] = 128;
@@ -44,10 +46,6 @@ ThreeAudio.Textures.prototype = {
 
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, d.length, history, 0, gl.ALPHA, gl.UNSIGNED_BYTE, empty);
     });
-
-    this.audioLevels = [[1, 0, 0, 0]];
-    this.audioLevelsSmooth = [0, 0, 0, 0];
-    this.audioLevelsChange = [0, 0, 0, 0];
   },
 
   update: function () {
@@ -58,57 +56,9 @@ ThreeAudio.Textures.prototype = {
         history = this.history,
         index = this.timeIndex,
         data = source.data;
-        levels = this.audioLevels,
-        smooth = this.audioLevelsSmooth,
-        change = this.audioLevelsChange,
-        bins = [0, 0, 0, 0];
 
     // Ensure audio data is up to date
     source.update();
-
-    // Calculate RMS of time data.
-    function rms(data) {
-      var size = data.length, accum = 0;
-      for (var i = 0; i < size; ++i) {
-        var s = (data[i] - 128) / 128;
-        accum += s*s;
-      }
-      return Math.sqrt(accum / size);
-    }
-
-    // Calculate energy level for all bins.
-    var waveforms = [data.time, data.filter.bass, data.filter.mid, data.filter.treble];
-    for (var j = 0; j < 4; ++j) {
-      bins[j] = rms(waveforms[j]);
-    }
-
-    // Keep 7 last level values
-    levels.unshift(bins);
-    if (levels.length > 7) levels.pop();
-
-    // Filter helpers
-    var accum, factors, gain, decay, samples;
-
-    // Calculate averages over 3 frames
-    factors = [1, 2, 1], gain = 4, samples = Math.min(levels.length, factors.length);
-    for (var i = 0; i < 4; ++i) {
-      accum = 0;
-      for (var j = 0; j < samples; ++j) {
-        accum += (levels[j] && levels[j][i] || 0) * factors[j];
-      }
-      smooth[i] = accum / gain;
-    }
-
-    // Calculate difference over 6 frames
-    factors = [1, 3, 2, -2, -3, -1], gain = 6, decay = .3, Math.min(levels.length, factors.length);
-    for (var i = 0; i < 4; ++i) {
-      accum = 0;
-      for (var j = 0; j < samples; ++j) {
-        accum += (levels[j] && levels[j][i] || 0) * factors[j];
-      }
-      // Apply additional decay filter to make less erratic.
-      change[i] = change[i] + (accum / gain - change[i]) * decay;
-    }
 
     // Update textures for frequency/time domain data.
     _.each(['freq', 'time'], function (key) {
@@ -129,11 +79,15 @@ ThreeAudio.Textures.prototype = {
   },
 
   uniforms: function () {
+    var levels = this.data.levels,
+        beat = this.data.beat;
     return {
-      audioLevels: this.audioLevels[0],
-      audioLevelsSmooth: this.audioLevelsSmooth,
-      audioLevelsChange: this.audioLevelsChange,
-      audioOffset: this.timeIndex / this.history,
+      audioIsBeat:       beat.is,
+      audioWasBeat:      beat.was, 
+      audioLevels:       levels.direct,
+      audioLevelsSmooth: levels.smooth,
+      audioLevelsChange: levels.change,
+      audioOffset:       this.timeIndex / this.history,
       audioStep: {
         x: 1 / (this.source.samples - 1),
         y: 1 / this.history//,
