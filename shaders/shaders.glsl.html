@@ -9,6 +9,10 @@ uniform sampler2D timeData;
 uniform float audioOffset;
 uniform vec2 audioStep;
 
+// Beat detection. Is = 0 or 1, Was = smoothed value.
+uniform float audioIsBeat;
+uniform float audioWasBeat;
+
 // Precalculated audio levels, the components being (all, bass, mid, treble).
 // Contains raw levels, smoothed levels and instantaneous change in levels.
 uniform float audioLevels[4];
@@ -49,6 +53,10 @@ uniform sampler2D timeData;
 // Offset and sample size for sampling data textures
 uniform float audioOffset;
 uniform vec2 audioStep;
+
+// Beat detection. Is = 0 or 1, Was = smoothed value.
+uniform float audioIsBeat;
+uniform float audioWasBeat;
 
 // Precalculated audio levels, the components being (all, bass, mid, treble).
 // Contains raw levels, smoothed levels and instantaneous change in levels.

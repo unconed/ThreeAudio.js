@@ -57,7 +57,7 @@ ThreeAudio.LevelDetect.prototype.analyse = function () {
   }
 
   // Calculate difference over 6 frames
-  factors = [1, 3, 2, -2, -3, -1], gain = 6, decay = .3, Math.min(levels.length, factors.length);
+  factors = [1, 3, 2, -2, -3, -1], gain = 6, decay = .5, Math.min(levels.length, factors.length);
   for (var i = 0; i < 4; ++i) {
     accum = 0;
     for (var j = 0; j < samples; ++j) {

@@ -79,8 +79,11 @@ ThreeAudio.Textures.prototype = {
   },
 
   uniforms: function () {
-    var levels = this.data.levels;
+    var levels = this.data.levels,
+        beat = this.data.beat;
     return {
+      audioIsBeat:       beat.is,
+      audioWasBeat:      beat.was, 
       audioLevels:       levels.direct,
       audioLevelsSmooth: levels.smooth,
       audioLevelsChange: levels.change,

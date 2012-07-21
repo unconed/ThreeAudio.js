@@ -1,5 +1,5 @@
 ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 2048;
+  this.fftSize = fftSize || 1024;
 
   this.filters = {};
   this.playing = false;
@@ -54,7 +54,7 @@ ThreeAudio.Source.prototype = {
 
       // Create delay node to compensate for FFT lag.
       filter.delayNode = c.createDelayNode();
-      filter.delayNode.delayTime.value = this.fftSize * 2 / c.sampleRate;
+      filter.delayNode.delayTime.value = 0;
 
       // Create gain node to offset filter loss.
       filter.gainNode = c.createGainNode();

@@ -6,6 +6,14 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
 
   // Uniform for time scrolling
   uniforms = _.extend(uniforms || {}, {
+    audioIsBeat: {
+      type: 'f',
+      value: 0//,
+    },
+    audioWasBeat: {
+      type: 'f',
+      value: 0//,
+    },
     audioLevels: {
       type: 'fv1',
       value: [0,0,0,0]//,
