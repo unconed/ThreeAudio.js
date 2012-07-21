@@ -287,7 +287,7 @@ ThreeAudio.BeatDetect.prototype = {
       beat.score = score ? (1 - second / score) : 0;
 
       // Confidence = score x permanence
-      beat.confidence = Math.sqrt(beat.score * beat.permanence);
+      beat.confidence = Math.min(1, beat.score + beat.permanence);
 
       // Only pick new BPM if it has higher confidence.
       if (this.beat) {
