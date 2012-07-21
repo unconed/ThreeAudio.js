@@ -1,5 +1,8 @@
 /**
- * Audio analyser: provide RMS levels + filters / derivatives.
+ * Audio analyser: provide beat detection
+ *
+ * Uses autocorrelation to find the BPM and then energy to find the 'drop'.
+ * Kinda crappy for anything but 4/4 house.
  */
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
@@ -305,7 +308,7 @@ ThreeAudio.BeatDetect.prototype = {
       this.debounceMaybe = 0;
 
       // Prediction is not working, use maybe beat.
-      if (!this.beat || this.beat.confidence < .5) {
+      if (!this.beat || this.beat.confidence < .3) {
         // But ignore rapid beats in succession
         this.measure = 0;
         data.beat.maybe = true;
@@ -322,15 +325,21 @@ ThreeAudio.BeatDetect.prototype = {
           if (offset < 0 && this.debouncePredict > 10) {
             data.beat.is = true;
             this.debouncePredict = 0;
-            this.missed -= 2;
+            this.missed = Math.max(0, this.missed - 2);
           }
+        }
+        else if (maybe > 0.4) {
+          // Realign due to drop.
+          this.measure = 0;
+          data.beat.is = true;
+          this.debouncePredict = 0;
         }
         // Ignore otherwise
       }
     }
 
     // Predict a beat.
-    if (this.beat && (this.beat.confidence > .5)) {
+    if (this.beat && (this.beat.confidence > .3)) {
       // See if we passed beat.window samples.
       var predict = (this.measure + 1) > this.beat.window;
       if (predict) {
@@ -339,15 +348,13 @@ ThreeAudio.BeatDetect.prototype = {
         // Check if prediction matches sound.
         if (maybe < 0) {
           this.missed++;
-          console.log('missed')
         }
         else {
           this.missed = Math.max(0, this.missed - 2);
         }
 
-        // Drop prediction if 4 beats were mispredicted
+        // Drop prediction if 6 beats were mispredicted
         if (this.missed > 6) {
-          console.log('dropped')
           this.missed = 0;
           this.beat = null;
           this.debounceMaybe = Math.floor(4 + Math.random() * 4);
