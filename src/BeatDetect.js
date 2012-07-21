@@ -5,6 +5,9 @@
  * - Uses autocorrelation of the signal to find the BPM.
  * - Uses energy detection to find major beats, and predicts missing beats using the BPM.
  *
+ * The autocorrelation helps figure out complicated drum patterns,
+ * while the prediction helps smooth out the noise.
+ *
  * Any piece of periodic music will be periodic in its autocorrelation.
  * This translates into a base frequency + harmonics in the frequency domain. By finding
  * the peaks of the frequency domain and matching up the harmonics, we can identify the

@@ -12,6 +12,8 @@ It can be used directly with Three.js or as a tQuery plug-in.
 
 ThreeAudio will read from an audio source and provide frequency/time data in the form of textures, as well as derived values for volume, bass, mid range and treble. Use the included ThreeAudio.Material class to create ShaderMaterials that can read from the audio data.
 
+ThreeAudio also includes a real-time beat detector based on autocorrelation.
+
 Includes: microevent.js (Jerome Etienne)
 
 *NOTE: ThreeAudio is still somewhat experimental and only Webkit Audio APIs are supported for now. Patches are welcome.*
