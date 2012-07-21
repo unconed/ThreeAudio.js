@@ -39,7 +39,7 @@ ThreeAudio.BeatDetect = function (data) {
     bpm: 0//,
   };
 
-  this.initDebug();
+  //this.initDebug();
 
   // Sample buffers
   this.n = 512;
