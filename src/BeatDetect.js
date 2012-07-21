@@ -362,7 +362,7 @@ ThreeAudio.BeatDetect.prototype = {
             this.missed = Math.max(0, this.missed - foundBonus);
           }
         }
-        // Realign due to bass drop. Be more generous the more we've missed.
+        // Realign if there is a powerful enough impulse. Be more generous the more we've missed.
         else if (maybe > (1 - this.missed / maxPenalty)) {
           this.measure = 0;
           data.beat.is = true;
