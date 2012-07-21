@@ -1,7 +1,21 @@
 /**
  * Audio analyser: provide beat detection
  *
- * Uses autocorrelation to find the BPM and then energy to find the 'drop'.
+ * It works in two stages:
+ * - Uses autocorrelation of the signal to find the BPM.
+ * - Uses energy detection to find major beats, and predicts missing beats using the BPM.
+ *
+ * Any piece of periodic music will have a peak in its autocorrelation at regular intervals.
+ * This translates into a base frequency + harmonics in the frequency domain. By finding
+ * the peaks of the frequency domain and matching up the harmonics, we can identify the
+ * dominant BPM. Peaks are interpolated quadratically and 
+ *
+ * Energy detection uses short filters and differentiation to find 'impulses'. These are used
+ * for the prediction of the next beat. This prediction is constantly adjusted as new
+ * impulses come in. The more accurate the prediction, the more locked in the pattern is and
+ * the more energy is needed to reset it. If too many beats are mispredicted, prediction stops
+ * and we try to find the beat again.
+ *
  * Kinda crappy for anything but 4/4 house.
  */
 ThreeAudio.BeatDetect = function (data) {
@@ -11,6 +25,7 @@ ThreeAudio.BeatDetect = function (data) {
   data.beat = {
     permanence: 0,
     confidence: 0,
+    missed: false,
     predicted: false,
     maybe: false,
     is: false,
@@ -26,13 +41,14 @@ ThreeAudio.BeatDetect = function (data) {
   this.buffer = new Float32Array(this.n);
   this.spectrum = new Float32Array(this.n);
   this.fft = new FFT(this.n, 44100);
+  this.sample = 0;
   this.energy = 0;
+  this.background = 0;
   this.last = 0;
   this.measure = 0;
-  this.sample = 0;
   this.debounceMaybe = 0;
   this.debouncePredict = 0;
-  this.missed = 0;
+  this.missed = 3;
   this.decay = 0;
 
   // Acceptable range 50-300 bpm
@@ -89,9 +105,8 @@ ThreeAudio.BeatDetect.prototype = {
         that = this;
 
     // Calculate sample to autocorrelate
-    // Tweak value with derivative to enhance higher frequencies in autocorrelation.
-    var sample = levels.direct[0];//(levels.direct[0] * 2 - this.sample);
-    this.sample = levels.direct[0];
+    var sample = levels.direct[0];
+//    this.sample = levels.direct[0];
 
     // Keep track of sound levels up to n samples.
     history.unshift(sample);
@@ -102,11 +117,10 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Calculate autocorrelation of buffer in frequency domain.
     fft.forward(buffer);
-    var real = fft.real, imag = fft.image, spectrum;
+    var spectrum = fft.real, real = fft.real, imag = fft.imag;
     for (var i = 0; i < n; ++i) {
-      fft.real[i] = fft.real[i] * fft.real[i] + fft.imag[i] * fft.imag[i];
+      spectrum[i] = real[i] * real[i] + imag[i] * imag[i];
     }
-    spectrum = fft.real;
 
     // Find maximum of autocorrelation spectrum in region of interest.
     var spectrumMax = 0;
@@ -116,16 +130,18 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Find peaks in autocorrelation spectrum.
     var peaks = {};
-    var cutoff = spectrumMax / 16;
+    var cutoff = spectrumMax / 16; // Ignore peaks less than 1/16th of maximum.
     for (var i = this.fMin + 1; i < this.fMax; ++i) {
       var energy = spectrum[i];
       if (energy > cutoff) {
         var max = Math.max(spectrum[i - 1], spectrum[i + 1]);
+        // Is this point higher than its neighbours?
         if (energy > max) {
           var min = Math.min(spectrum[i - 1], spectrum[i + 1]);
           var diff = Math.abs(energy - min),
               discriminant = diff / energy;
 
+          // Peak must dip 50% on at least one side
           if (discriminant > .5) {
             var strength = Math.sqrt(energy / spectrumMax);
             peaks[i] = strength;
@@ -211,8 +227,8 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Compare peaks against reference peak
-    function comparePeaks(reference, factor) {
-      var result = 0, cutoff = reference.offset * (1 + .5 / factor);
+    function comparePeaks(reference) {
+      var result = 0, cutoff = reference.offset * 1.5;
 
       // Pairwise comparison
       _.each(histogramSorted, function (peak) {
@@ -220,7 +236,7 @@ ThreeAudio.BeatDetect.prototype = {
         if (peak.offset < cutoff) return;
 
         // Calculate match value based on narrow window around integer ratios.
-        var ratio = peak.offset / reference.offset * factor,
+        var ratio = peak.offset / reference.offset,
             match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
 
         // Scale by peak strength
@@ -237,17 +253,12 @@ ThreeAudio.BeatDetect.prototype = {
     _.each(histogramSorted, function (reference) {
       var accum = 0;
 
-      // Try both real bpm and half bpm, as the
-      // second harmonic is often stronger than the first.
-      var factors = [1];
-      _.each(factors, function (factor) {
-        if (reference.offset / factor < fMin) return;
-        var result = comparePeaks(reference, factor);
+      if (reference.offset < fMin) return;
+      var result = comparePeaks(reference);
 
-        if (result > accum) {
-          accum = result;
-        }
-      });
+      if (result > accum) {
+        accum = result;
+      }
 
       // Add this peak's strength
       accum += reference.strength * reference.permanence;
@@ -289,14 +300,19 @@ ThreeAudio.BeatDetect.prototype = {
       }
     }
 
-    // Find energy impulse of bass to mark beginning of measure
-    var energy = levels.direct[1] + levels.direct[3];
-    var diff = (energy * 2 - this.last);
-    this.energy = this.energy + (diff - this.energy) * .2;
-    this.last = energy;
-    maybe = (diff - this.energy * 2);
+    // Find energy impulse to mark beginning of measure
+    var energy = levels.direct[0];
+    // Separate signal from background
+    this.background = this.background + (energy - this.background) * .2;
+    this.energy = this.energy + (energy - this.energy) * .4;
+    var signal = (this.energy - this.background) / (1 - this.background) * 3;
+
+    // Tweak with derivative
+    maybe = (signal * 2 - this.last) - .2;
+    this.last = signal;
 
     // Prepare beat data
+    data.beat.missed = false;
     data.beat.maybe = false;
     data.beat.is = false;
     data.beat.predicted = false;
@@ -306,15 +322,28 @@ ThreeAudio.BeatDetect.prototype = {
       data.beat.bpm = this.beat.bpm;
     }
 
+    // Constants for rejection algorithm.
+    var foundBonus = 3,
+        missedPenalty = 1,
+        maxPenalty = 10,
+        debounceFrames = 10;
+
     // Find a maybe beat to get started.
-    if (maybe > 0.1 && this.debounceMaybe > 10) {
+    if (maybe > 0.1 && this.debounceMaybe > debounceFrames) {
       this.debounceMaybe = 0;
 
       // Prediction is not working, use maybe beat.
       if (!this.beat || this.beat.confidence < .3) {
         // But ignore rapid beats in succession
         this.measure = 0;
-        data.beat.maybe = true;
+
+        // If strong enough, accept as real beat
+        if (maybe > .4) {
+          data.beat.is = true;
+        }
+        else {
+          data.beat.maybe = true;
+        }
       }
       else if (this.beat) {
         // See how well it matches our model
@@ -325,17 +354,19 @@ ThreeAudio.BeatDetect.prototype = {
         if (Math.abs(offset) < 5) {
           this.measure -= offset;
           // If prediction is late, pre-empt it.
-          if (offset < 0 && this.debouncePredict > 10) {
+          if (offset <= 0 && this.debouncePredict > debounceFrames) {
             data.beat.is = true;
+            if (offset == 0) data.beat.predicted = true;
             this.debouncePredict = 0;
-            this.missed = Math.max(0, this.missed - 2);
+            this.missed = Math.max(0, this.missed - foundBonus);
           }
         }
-        else if (maybe > 0.8) {
-          // Realign due to drop.
+        // Realign due to bass drop. Be more generous the more we've missed.
+        else if (maybe > (1 - this.missed / maxPenalty)) {
           this.measure = 0;
           data.beat.is = true;
           this.debouncePredict = 0;
+          this.missed = Math.max(0, this.missed - foundBonus);
         }
         // Ignore otherwise
       }
@@ -343,29 +374,39 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Predict a beat.
     if (this.beat && (this.beat.confidence > .3)) {
+      var debounce = this.debouncePredict > debounceFrames;
+
       // See if we passed beat.window samples.
-      var predict = (this.measure + 1) > this.beat.window;
+      var predict = this.measure > this.beat.window;
       if (predict) {
         this.measure -= this.beat.window;
+      }
 
-        // Check if prediction matches sound.
+      // Check if prediction matches sound.
+      if (predict && debounce) {
         if (maybe < 0) {
-          this.missed++;
+          this.missed = Math.min(maxPenalty, this.missed + missedPenalty);
+          data.beat.missed = true;
         }
         else {
-          this.missed = Math.max(0, this.missed - 2);
+          this.missed = Math.max(0, this.missed - foundBonus);
         }
 
-        // Drop prediction if 6 beats were mispredicted
-        if (this.missed > 6) {
-          this.missed = 0;
-          this.beat = null;
-          this.debounceMaybe = Math.floor(4 + Math.random() * 4);
+        if (this.missed > 4) {
+          // Ignore prediction if previous 4 beats were mispredicted
+          predict = false;
+
+          data.beat.maybe = true;
+          data.beat.predicted = true;
+
+          // Shift decounce randomly to attempt to hit the right beat.
+          this.debounceMaybe += Math.random() * debounceFrames;
+          this.debouncePredict = 0;
         }
       }
 
       // Ignore rapid predictions due to shifting BPM
-      if (predict && this.debouncePredict > 10) {
+      if (predict && debounce) {
         this.debouncePredict = 0;
         data.beat.is = true;
         data.beat.predicted = true;
@@ -373,8 +414,8 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Provide decayed beat value
-    this.decay = this.decay + (+data.beat.is * 5 - this.decay) * .2;
-    data.beat.was = data.beat.was + (this.decay * 2 - data.beat.was) * .5;
+    this.decay = this.decay + (+data.beat.is * 3.3 - this.decay) * .3;
+    data.beat.was = data.beat.was + (this.decay * 3.3 - data.beat.was) * .3;
 
     // Advance a frame.
     this.debounceMaybe++;
@@ -382,7 +423,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.measure++;
 
     //////////////
-    this.debug(levels.direct, sample, diff, maybe, spectrum, peaks, histogramSorted, data.beat);
+    this.debug(levels.direct, sample, signal, maybe, spectrum, peaks, histogramSorted, data.beat);
   },
 
 
@@ -443,7 +484,8 @@ ThreeAudio.BeatDetect.prototype = {
 
       // Show beats
       if (beat.is) {
-        g.fillStyle = beat.predicted ? 'rgba(255,0,0,.5)' : 'rgba(255,180,0,.5)';
+        g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
+                      : (beat.predicted ? 'rgba(255,180,0,.5)' : 'rgba(30,180,0,.5)');
         g.fillRect(this.i, 0, 1, 100)
       }
       var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
@@ -452,7 +494,7 @@ ThreeAudio.BeatDetect.prototype = {
 
       // Show maybe beats
       if (beat.maybe) {
-        g.fillStyle = 'rgba(0,180,255,.5)';
+        g.fillStyle = beat.predicted ? 'rgba(100,0,230,.5)' : 'rgba(0,180,255,.5)';
         g.fillRect(this.i, 0, 1, 100)
       }
 
