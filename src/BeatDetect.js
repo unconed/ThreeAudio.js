@@ -5,16 +5,17 @@
  * - Uses autocorrelation of the signal to find the BPM.
  * - Uses energy detection to find major beats, and predicts missing beats using the BPM.
  *
- * Any piece of periodic music will have a peak in its autocorrelation at regular intervals.
+ * Any piece of periodic music will be periodic in its autocorrelation.
  * This translates into a base frequency + harmonics in the frequency domain. By finding
  * the peaks of the frequency domain and matching up the harmonics, we can identify the
- * dominant BPM. Peaks are interpolated quadratically and 
+ * dominant BPM. Peaks are interpolated quadratically and tracked across frames to
+ * rank them by strength and permanence.
  *
  * Energy detection uses short filters and differentiation to find 'impulses'. These are used
- * for the prediction of the next beat. This prediction is constantly adjusted as new
+ * to seed the prediction of the next beat. This prediction is constantly adjusted as new
  * impulses come in. The more accurate the prediction, the more locked in the pattern is and
  * the more energy is needed to reset it. If too many beats are mispredicted, prediction stops
- * and we try to find the beat again.
+ * and it tries to find the beat again.
  *
  * Kinda crappy for anything but 4/4 house.
  */
@@ -414,8 +415,8 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Provide decayed beat value
-    this.decay = this.decay + (+data.beat.is * 3.3 - this.decay) * .3;
-    data.beat.was = data.beat.was + (this.decay * 3.3 - data.beat.was) * .3;
+    this.decay = this.decay + (+data.beat.is * 3 - this.decay) * .33;
+    data.beat.was = data.beat.was + (this.decay * 3 - data.beat.was) * .33;
 
     // Advance a frame.
     this.debounceMaybe++;
