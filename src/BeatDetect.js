@@ -24,7 +24,7 @@
  *
  * Uses the levels of LevelDetect as input.
  */
-var __taDebug = true;
+var __taDebug = false;
 
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
@@ -508,8 +508,8 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Provide decayed beat value
-    this.decay = this.decay + (+data.beat.is * 3 - this.decay) * .33;
-    data.beat.was = data.beat.was + (this.decay * 3 - data.beat.was) * .33;
+    this.decay = this.decay + (+data.beat.is * 2.5 - this.decay) * .4;
+    data.beat.was = data.beat.was + (this.decay * 2.5 - data.beat.was) * .4;
 
     // Advance a frame.
     this.debounceMaybe++;
@@ -554,15 +554,17 @@ ThreeAudio.BeatDetect.prototype = {
 
     var out = [ '<strong>' + Math.round(beat.bpm * 10) / 10
               + ' BPM (' + Math.round(100 * beat.confidence)
-              + '%) p:' + Math.round(beat.permanence * 100)
-              + ' w = ' + Math.round(+(this.beat && this.beat.window) * 10) / 10
+              + '%) P:' + Math.round(beat.permanence * 100)
               + ' µ = ' + Math.round(this.mean * 10) / 10
               + ' σ = '+ Math.round(this.stddev * 100) / 100
               +'</strong> '+ this.found + 'f ' + this.missed +'m'];
 
     _.each(histogram, function (peak) {
       var bpm = Math.round(that.offsetToBPM(peak.offset) * 10) / 10;
-      out.push([bpm, ' bpm - ', Math.round(peak.offset * 10) / 10, ' ', Math.round(peak.fraction * 100) / 100, ' -', Math.round(peak.strength * 100), '% - p: ', Math.round(peak.permanence * 100)].join(''));
+      out.push([
+        bpm, ' bpm - ',
+        Math.round(peak.strength * 100), '%',
+        ' P: ', Math.round(peak.permanence * 100)].join(''));
     });
     this.t.innerHTML = out.join('<br>');
 
