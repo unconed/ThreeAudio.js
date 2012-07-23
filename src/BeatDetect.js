@@ -24,7 +24,7 @@
  *
  * Uses the levels of LevelDetect as input.
  */
-var __taDebug = false;
+var __taDebug = true;
 
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
@@ -122,22 +122,38 @@ ThreeAudio.BeatDetect.prototype = {
         histogramSorted = this.histogramSorted,
         that = this;
 
-    // Calculate RMS^2 of time data.
-    function rms2(data) {
-      var size = data.length, accum = 0;
-      for (var i = 0; i < size; ++i) {
-        var s = (data[i] - 128) / 128;
-        accum += s*s;
-      }
-      return accum / size;
+    // Prepare beat data
+    data.beat.missed = false;
+    data.beat.maybe = false;
+    data.beat.is = false;
+    data.beat.predicted = false;
+    if (this.beat) {
+      data.beat.confidence = this.beat.confidence;
+      data.beat.permanence = this.beat.permanence;
+      data.beat.bpm = this.beat.bpm;
     }
 
+    // Process energy to find impulses of sound
+    var energy = levels.direct[0];
+
+    // Separate signal from background
+    this.background = this.background + (energy - this.background) * .2;
+    this.energy = this.energy + (energy - this.energy) * .4;
+    var signal = (this.energy - this.background) / (1 - this.background) * 3;
+    this.signal = signal;
+
+    // Tweak with signal derivative, normalize and threshold for 'maybe' beat value.
+    var lastMaybe = this.maybe;
+    maybe = (signal * 2 - this.signal);
+    this.maxMaybe = Math.max(this.maxMaybe * .99, maybe);
+    this.maybe = maybe = maybe / Math.max(.2, this.maxMaybe) - .7;
+
     // Calculate sample to autocorrelate
-    var sample = levels.direct[0];
-    this.sample = levels.direct[0];
+    var sample = signal;
+    this.sample = signal;
 
     // Keep track of sound levels up to n samples.
-    history.unshift(sample);
+    history.unshift(signal);
     while (history.length > n) history.pop();
 
     // Update float buffer
@@ -265,7 +281,7 @@ ThreeAudio.BeatDetect.prototype = {
 
         // Calculate match value based on narrow window around integer ratios.
         var ratio = peak.offset / reference.offset,
-            match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
+            match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 4);
 
         // Scale by peak strength
         strength = peak.strength * peak.permanence * ratio;
@@ -328,31 +344,6 @@ ThreeAudio.BeatDetect.prototype = {
       }
     }
 
-    // Find energy impulse to mark beginning of measure
-    var energy = levels.direct[0];
-    // Separate signal from background
-    this.background = this.background + (energy - this.background) * .2;
-    this.energy = this.energy + (energy - this.energy) * .4;
-    var signal = (this.energy - this.background) / (1 - this.background) * 3;
-    this.signal = signal;
-
-    // Tweak with signal derivative, normalize and threshold.
-    var lastMaybe = this.maybe;
-    maybe = (signal * 2 - this.signal);
-    this.maxMaybe = Math.max(this.maxMaybe * .99, maybe);
-    this.maybe = maybe = maybe / Math.max(.2, this.maxMaybe) - .7;
-
-    // Prepare beat data
-    data.beat.missed = false;
-    data.beat.maybe = false;
-    data.beat.is = false;
-    data.beat.predicted = false;
-    if (this.beat) {
-      data.beat.confidence = this.beat.confidence;
-      data.beat.permanence = this.beat.permanence;
-      data.beat.bpm = this.beat.bpm;
-    }
-
     // Constants for rejection algorithm.
     var foundBonus = 3,
         missedPenalty = 1,
@@ -367,7 +358,7 @@ ThreeAudio.BeatDetect.prototype = {
     var beatWindow = this.beat && this.beat.window;
 
     // Find a maybe beat to get started.
-    if (maybe > 0 && lastMaybe < 0 && this.debounceMaybe > debounceFrames) {
+    if (maybe > 0 && lastMaybe <= 0 && this.debounceMaybe > debounceFrames) {
       // Ignore rapid maybe beats in succession
       this.debounceMaybe = 0;
 
@@ -555,7 +546,7 @@ ThreeAudio.BeatDetect.prototype = {
         if (peak.offset > cutoff) {
           // Calculate match value based on narrow window around integer ratios.
           var ratio = peak.offset / reference.offset;
-          match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
+          match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 4);
         }
         peak.match = match;
       });
@@ -567,7 +558,7 @@ ThreeAudio.BeatDetect.prototype = {
               + ' w = ' + Math.round(+(this.beat && this.beat.window) * 10) / 10
               + ' µ = ' + Math.round(this.mean * 10) / 10
               + ' σ = '+ Math.round(this.stddev * 100) / 100
-              +'</strong> '+ this.found + 'f ' + this.missed +'m ' + this.intervals.join(',')];
+              +'</strong> '+ this.found + 'f ' + this.missed +'m'];
 
     _.each(histogram, function (peak) {
       var bpm = Math.round(that.offsetToBPM(peak.offset) * 10) / 10;
@@ -636,25 +627,19 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Show sample
-    if (sample) {
-      sample = Math.floor(Math.max(0, Math.min(1, sample*2)) * 255);
-      g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
-      g.fillRect(this.i, 80, 1, 20)
-    }
+    sample = Math.floor(Math.max(0, Math.min(1, sample+.5)) * 255);
+    g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
+    g.fillRect(this.i, 80, 1, 20)
 
     // Show diff
-    if (diff) {
-      diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
-      g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
-      g.fillRect(this.i, 100, 1, 20)
-    }
+    diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
+    g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
+    g.fillRect(this.i, 100, 1, 20)
 
     // Show maybe
-    if (maybe) {
-      maybe = maybe > 0 ? Math.floor(Math.max(0, Math.min(1, maybe + .5)) * 255) : 0;
-      g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
-      g.fillRect(this.i, 120, 1, 20)
-    }
+    maybe = (beat.is || beat.maybe) ? Math.floor(Math.max(0, Math.min(1, maybe + .5)) * 255) : 0;
+    g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
+    g.fillRect(this.i, 120, 1, 20)
 
     this.i = (i + 1) % 512;
 
