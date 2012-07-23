@@ -24,6 +24,8 @@
  *
  * Uses the levels of LevelDetect as input.
  */
+var __taDebug = false;
+
 ThreeAudio.BeatDetect = function (data) {
   this.data = data;
 
@@ -36,26 +38,35 @@ ThreeAudio.BeatDetect = function (data) {
     maybe: false,
     is: false,
     was: 0,
+    stddev: 0,
     bpm: 0//,
   };
 
-  //this.initDebug();
+  __taDebug && this.initDebug();
 
   // Sample buffers
   this.n = 512;
   this.history = [[],[],[]];
   this.buffer = new Float32Array(this.n);
-  this.spectrum = new Float32Array(this.n);
+  this.spectrum = null;
   this.fft = new FFT(this.n, 44100);
-  this.sample = 0;
-  this.energy = 0;
-  this.background = 0;
-  this.last = 0;
-  this.measure = 0;
-  this.debounceMaybe = 0;
-  this.debouncePredict = 0;
-  this.missed = 3;
-  this.decay = 0;
+  this.sample = 0; // Sample to feed into the autocorrelator
+  this.background = 0; // Long-term energy level
+  this.energy = 0; // Short-term energy level
+  this.signal = 0; // Signal as distinguished from background
+  this.measure = 0; // Frames since last beat
+  this.maybe = 0; // Heuristic for instant beat detection
+  this.maxMaybe = 0; // Normalization for maybe
+  this.debounceMaybe = 0; // Debounce maybe beats
+  this.debouncePredict = 0; // Debounce predicted beats
+  this.decay = 0; // Decay value for beat flasher
+  this.intervals = []; // Inter-beat intervals
+  this.mean = 0; // Mean of beat intervals
+  this.stddev = 0; // Variance/stddev in beat intervals
+  this.missed = 3;  // Missed beats score
+  this.found = 0;   // Found beats score
+  this.predicted = false; // Whether last predicted beat was used.
+  this.green = 0; // Number of good beats found in succession
 
   // Acceptable range 50-300 bpm
   this.fMin = Math.floor(this.bpmToOffset(50));
@@ -65,6 +76,7 @@ ThreeAudio.BeatDetect = function (data) {
   this.histogram = {};
   this.histogramSorted = [];
   this.beat = null;
+  this.frames = 0;
 };
 
 ThreeAudio.BeatDetect.prototype = {
@@ -79,7 +91,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.i = 0;
 
     this.t = document.createElement('div');
-    this.t.width = 512;
+    this.t.width = 256;
     this.t.height = 200;
     this.t.style.background = 'rgba(0,0,0,.3)';
     this.t.style.color = '#fff';
@@ -110,9 +122,19 @@ ThreeAudio.BeatDetect.prototype = {
         histogramSorted = this.histogramSorted,
         that = this;
 
+    // Calculate RMS^2 of time data.
+    function rms2(data) {
+      var size = data.length, accum = 0;
+      for (var i = 0; i < size; ++i) {
+        var s = (data[i] - 128) / 128;
+        accum += s*s;
+      }
+      return accum / size;
+    }
+
     // Calculate sample to autocorrelate
     var sample = levels.direct[0];
-//    this.sample = levels.direct[0];
+    this.sample = levels.direct[0];
 
     // Keep track of sound levels up to n samples.
     history.unshift(sample);
@@ -123,7 +145,7 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Calculate autocorrelation of buffer in frequency domain.
     fft.forward(buffer);
-    var spectrum = fft.real, real = fft.real, imag = fft.imag;
+    var spectrum = this.spectrum = fft.real, real = fft.real, imag = fft.imag;
     for (var i = 0; i < n; ++i) {
       spectrum[i] = real[i] * real[i] + imag[i] * imag[i];
     }
@@ -312,10 +334,13 @@ ThreeAudio.BeatDetect.prototype = {
     this.background = this.background + (energy - this.background) * .2;
     this.energy = this.energy + (energy - this.energy) * .4;
     var signal = (this.energy - this.background) / (1 - this.background) * 3;
+    this.signal = signal;
 
-    // Tweak with derivative
-    maybe = (signal * 2 - this.last) - .2;
-    this.last = signal;
+    // Tweak with signal derivative, normalize and threshold.
+    var lastMaybe = this.maybe;
+    maybe = (signal * 2 - this.signal);
+    this.maxMaybe = Math.max(this.maxMaybe * .99, maybe);
+    this.maybe = maybe = maybe / Math.max(.2, this.maxMaybe) - .7;
 
     // Prepare beat data
     data.beat.missed = false;
@@ -332,90 +357,162 @@ ThreeAudio.BeatDetect.prototype = {
     var foundBonus = 3,
         missedPenalty = 1,
         maxPenalty = 10,
-        debounceFrames = 10;
+        maxFound = 10,
+        debounceFrames = 5;
+
+    var lastMeasure = this.measure;
+
+    // Choose window for beat prediction based on accuracy
+//    var beatWindow = this.beat ? ((this.mean && (this.stddev < 3)) ? this.mean : this.beat.window) : 0;
+    var beatWindow = this.beat && this.beat.window;
 
     // Find a maybe beat to get started.
-    if (maybe > 0.1 && this.debounceMaybe > debounceFrames) {
+    if (maybe > 0 && lastMaybe < 0 && this.debounceMaybe > debounceFrames) {
+      // Ignore rapid maybe beats in succession
       this.debounceMaybe = 0;
 
       // Prediction is not working, use maybe beat.
       if (!this.beat || this.beat.confidence < .3) {
-        // But ignore rapid beats in succession
+        // Accept as real beat and reset measure
         this.measure = 0;
-
-        // If strong enough, accept as real beat
-        if (maybe > .4) {
-          data.beat.is = true;
-        }
-        else {
-          data.beat.maybe = true;
-        }
+        data.beat.is = true;
+        data.beat.maybe = true;
       }
       else if (this.beat) {
-        // See how well it matches our model
-        var half = this.beat.window / 2;
-        var offset = ((this.measure + half) % this.beat.window) - half;
 
-        // Resynchronize beat if close to prediction
-        if (Math.abs(offset) < 5) {
-          this.measure -= offset;
+        // See how well this maybe beat matches our model
+        var half = this.beat.window / 2;
+        var offset = ((this.measure + half) % beatWindow) - half;
+        var jitter = this.stddev && Math.max(5, Math.min(this.stddev + 1, 10)) || 10;
+
+        // Realign beat if close to prediction
+        if (Math.abs(offset) < jitter) {
+          this.measure = 0;
+
           // If prediction is late, pre-empt it.
-          if (offset <= 0 && this.debouncePredict > debounceFrames) {
+          // If prediction was early but dropped, restore it.
+          if ((offset <= 1 && this.debouncePredict > debounceFrames)
+           || !this.predicted) {
             data.beat.is = true;
-            if (offset == 0) data.beat.predicted = true;
+            if (offset >= 0) data.beat.predicted = true;
             this.debouncePredict = 0;
           }
+          else {
+            // Ignore maybe beat
+            data.beat.maybe = true;
+          }
+
+          this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
-        // Realign if there is a powerful enough impulse. Be more generous the more we've missed.
-        else if (maybe > (1 - this.missed / maxPenalty)) {
+        // Reset if there is a powerful enough impulse. Be more generous the more we've missed.
+        else if ((maybe > (1 + this.found*.5 - this.missed / maxPenalty))
+              || (this.found == 0 || this.missed > 4)) {
           this.measure = 0;
           data.beat.is = true;
           this.debouncePredict = 0;
+
+          this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
-        // Ignore otherwise
+        else {
+          // Ignore maybe beat
+          data.beat.maybe = true;
+        }
       }
     }
 
     // Predict a beat.
     if (this.beat && (this.beat.confidence > .3)) {
+      // Debounce predictions
       var debounce = this.debouncePredict > debounceFrames;
 
       // See if we passed beat.window samples.
-      var predict = this.measure > this.beat.window;
+      var predict = this.measure >= beatWindow;
       if (predict) {
-        this.measure -= this.beat.window;
+        this.measure -= beatWindow;
       }
 
       // Check if prediction matches sound.
       if (predict && debounce) {
         if (maybe < 0) {
+          this.found = Math.max(0, this.found - 1);
           this.missed = Math.min(maxPenalty, this.missed + missedPenalty);
           data.beat.missed = true;
+          data.beat.predicted = true;
         }
         else {
+          this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
 
-        if (this.missed > 4) {
-          // Ignore prediction if previous 4 beats were mispredicted
+        if (this.found < 1) {
+          // Ignore prediction if not certain yet
           predict = false;
-
+          data.beat.maybe = true;
+          data.beat.predicted = true;
+          this.debouncePredict = 0;
+        }
+        else if (this.missed > 4) {
+          // Previous 4 beats were mispredicted
+          predict = false;
           data.beat.maybe = true;
           data.beat.predicted = true;
 
           // Shift decounce randomly to attempt to hit the right beat.
+          this.measure += Math.random() * debounceFrames;
           this.debounceMaybe += Math.random() * debounceFrames;
           this.debouncePredict = 0;
         }
+
+        this.predicted = predict;
       }
 
-      // Ignore rapid predictions due to shifting BPM
+      // If prediction not rejected, use it.
       if (predict && debounce) {
         this.debouncePredict = 0;
         data.beat.is = true;
         data.beat.predicted = true;
+      }
+    }
+
+    // Analyse beats for consistency.
+    var interval = 0;
+
+    if (data.beat.missed) {
+      this.green = 0;
+      // Use autocorrelated BPM
+      interval = this.beat.window;
+    }
+    else if (data.beat.is) {
+      if (this.green++) {
+        // Use beat BPM
+        interval = this.frames - this.lastGreen;
+      }
+      this.lastGreen = this.frames;
+    }
+    if (interval) {
+      var intervals = this.intervals;
+
+      // Keep track of last 16 intervals
+      intervals.unshift(lastMeasure);
+      if (intervals.length > 16) {
+        intervals.pop();
+      }
+
+      // Calculate mean/stddev
+      if (intervals.length > 2) {
+        var sum = 0, variance = 0;
+        l = intervals.length;
+        for (var i = 0; i < l; ++i) {
+          sum += intervals[i];
+          variance += intervals[i] * intervals[i];
+        }
+        sum /= l;
+        variance /= l;
+
+        this.mean = sum;
+        this.stddev = Math.sqrt(variance - sum*sum);
       }
     }
 
@@ -427,122 +524,140 @@ ThreeAudio.BeatDetect.prototype = {
     this.debounceMaybe++;
     this.debouncePredict++;
     this.measure++;
+    this.frames++;
 
     //////////////
-    this.debug(levels.direct, sample, signal, maybe, spectrum, peaks, histogramSorted, data.beat);
+    __taDebug && this.debug();
   },
 
 
   // Draw debug info into canvas / dom
-  debug: function (levels, sample, diff, maybe, spectrum, peaks, histogram, beat) {
+  debug: function () {
+    var levels = this.data.levels.direct,
+        sample = this.sample,
+        diff = this.signal,
+        maybe = this.maybe,
+        spectrum = this.spectrum,
+        histogram = this.histogram,
+        beat = this.data.beat,
+        mean = this.mean,
+        stddev = this.stddev;
+
     var that = this;
     var n = this.n;
 
-    if (this.g) {
-      // Mark histogram beats according to active BPM.
-      if (this.beat) {
-        var reference = this.beat;
-        var cutoff = reference.offset * 1.5;
-        _.each(histogram, function (peak) {
-          var match = (peak == reference ? 1 : 0);
-          if (peak.offset > cutoff) {
-            // Calculate match value based on narrow window around integer ratios.
-            var ratio = peak.offset / reference.offset;
-            match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
-          }
-          peak.match = match;
-        });
-      }
-
-      var out = [ '<strong>' + Math.round(beat.bpm * 10) / 10 + ' BPM (' + (Math.round(100 * beat.confidence)) + '%) ' + Math.round(beat.permanence * 100) + '</strong>' ];
+    // Mark histogram beats according to active BPM.
+    if (this.beat) {
+      var reference = this.beat;
+      var cutoff = reference.offset * 1.5;
       _.each(histogram, function (peak) {
-        var bpm = Math.round(that.offsetToBPM(peak.offset) * 10) / 10;
-        out.push([bpm, ' bpm - ', Math.round(peak.offset * 10) / 10, ' ', Math.round(peak.fraction * 100) / 100, ' - %: ', Math.round(peak.strength * 100), ' - p: ', Math.round(peak.permanence * 100)].join(''));
+        var match = (peak == reference ? 1 : 0);
+        if (peak.offset > cutoff) {
+          // Calculate match value based on narrow window around integer ratios.
+          var ratio = peak.offset / reference.offset;
+          match = Math.max(0, 1 - Math.abs(ratio - Math.round(ratio)) * 8);
+        }
+        peak.match = match;
       });
-      this.t.innerHTML = out.join('<br>');
-
-      var g = this.g;
-
-      // Draw graph bg
-      g.fillStyle = '#000000';
-      g.fillRect(0, 140, 512, 100);
-
-      // Draw spectrum
-      var max = 0;
-      for (var i = 2; i < n/8; ++i) {
-        max = Math.max(spectrum[i], max);
-      }
-      var norm = 1/max;
-      g.beginPath();
-      g.moveTo(0, 200);
-      for (var i = 2; i < n/8; ++i) {
-        g.lineTo((i-2)*8, 240-(spectrum[i]*norm)*100);
-      }
-      g.strokeStyle = '#ffffff';
-      g.stroke();
-
-      // Highlight peaks
-      _.each(histogram, function (peak) {
-        var alpha = peak.strength *.75 + .25;
-        var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(180 + 40 * peak.match), 0].join(',') : '255,10,10';
-        g.fillStyle = 'rgba('+color+','+ alpha +')';
-        g.fillRect((peak.offset - 2) * 8, 140, 1, 100);
-      })
-
-      // Plot levels voiceprint
-      var i = this.i;
-      var j = 0;
-      function plot(l) {
-        l = Math.round(Math.max(0, Math.min(255, l * 255)));
-        g.fillStyle = 'rgb(' + [l,l,l].join(',') + ')';
-        g.fillRect(i, j, 1, 20)
-        j += 20;
-      }
-      plot(levels[0]);
-      plot(levels[1]);
-      plot(levels[2]);
-      plot(levels[3]);
-
-      // Show beats
-      if (beat.is) {
-        g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
-                      : (beat.predicted ? 'rgba(255,180,0,.75)' : 'rgba(60,220,0,.75)');
-        g.fillRect(this.i, 0, 2, 100)
-      }
-      var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
-      g.fillStyle = 'rgb('+c+','+c+','+c+')';
-      g.fillRect(412, 240, 100, 100)
-
-      // Show maybe beats
-      if (beat.maybe) {
-        g.fillStyle = beat.predicted ? 'rgba(64,64,64,.75)' : 'rgba(0,180,255,.75)';
-        g.fillRect(this.i, 0, 2, 100)
-      }
-
-      // Show sample
-      if (sample) {
-        sample = Math.floor(Math.max(0, Math.min(1, sample*2)) * 255);
-        g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
-        g.fillRect(this.i, 80, 1, 20)
-      }
-
-      // Show diff
-      if (diff) {
-        diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
-        g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
-        g.fillRect(this.i, 100, 1, 20)
-      }
-
-      // Show maybe
-      if (maybe) {
-        maybe = Math.floor(Math.max(0, Math.min(1, maybe*2)) * 255);
-        g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
-        g.fillRect(this.i, 120, 1, 20)
-      }
-
-      this.i = (i + 1) % 512;
-
     }
+
+    var out = [ '<strong>' + Math.round(beat.bpm * 10) / 10
+              + ' BPM (' + Math.round(100 * beat.confidence)
+              + '%) p:' + Math.round(beat.permanence * 100)
+              + ' w = ' + Math.round(+(this.beat && this.beat.window) * 10) / 10
+              + ' µ = ' + Math.round(this.mean * 10) / 10
+              + ' σ = '+ Math.round(this.stddev * 100) / 100
+              +'</strong> '+ this.found + 'f ' + this.missed +'m ' + this.intervals.join(',')];
+
+    _.each(histogram, function (peak) {
+      var bpm = Math.round(that.offsetToBPM(peak.offset) * 10) / 10;
+      out.push([bpm, ' bpm - ', Math.round(peak.offset * 10) / 10, ' ', Math.round(peak.fraction * 100) / 100, ' -', Math.round(peak.strength * 100), '% - p: ', Math.round(peak.permanence * 100)].join(''));
+    });
+    this.t.innerHTML = out.join('<br>');
+
+    var g = this.g;
+
+    // Draw graph bg
+    g.fillStyle = '#000000';
+    g.fillRect(0, 140, 512, 100);
+
+    // Draw spectrum
+    var max = 0;
+    for (var i = 2; i < n/8; ++i) {
+      max = Math.max(spectrum[i], max);
+    }
+    var norm = 1/max;
+    g.beginPath();
+    g.moveTo(0, 200);
+    for (var i = 2; i < n/8; ++i) {
+      g.lineTo((i-2)*8, 240-(spectrum[i]*norm)*100);
+    }
+    g.strokeStyle = '#ffffff';
+    g.stroke();
+
+    // Highlight peaks
+    _.each(histogram, function (peak) {
+      var alpha = peak.strength *.75 + .25;
+      var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(180 + 40 * peak.match), 0].join(',') : '255,10,10';
+      g.fillStyle = 'rgba('+color+','+ alpha +')';
+      g.fillRect((peak.offset - 2) * 8, 140, 1, 100);
+    })
+
+    // Plot levels voiceprint
+    var i = this.i;
+    var j = 0;
+    function plot(l) {
+      l = Math.round(Math.max(0, Math.min(255, l * 255)));
+      g.fillStyle = 'rgb(' + [l,l,l].join(',') + ')';
+      g.fillRect(i, j, 1, 20)
+      j += 20;
+    }
+//      plot(levels[0]);
+    plot(levels[1]);
+    plot(levels[2]);
+    plot(levels[3]);
+    plot(0);
+
+    // Show beats
+    if (beat.is) {
+      g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
+                    : (beat.maybe ? 'rgba(0,180,255,.75)'
+                    : (beat.predicted ? 'rgba(255,180,0,.75)' : 'rgba(60,220,0,.75)'));
+      g.fillRect(this.i, 0, 2, 100)
+    }
+    var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
+    g.fillStyle = 'rgb('+c+','+c+','+c+')';
+    g.fillRect(412, 240, 100, 100)
+
+    // Show maybe beats
+    if (beat.maybe && !beat.is) {
+      g.fillStyle = 'rgba(64,64,64,.75)';
+      g.fillRect(this.i, 0, 2, 100)
+    }
+
+    // Show sample
+    if (sample) {
+      sample = Math.floor(Math.max(0, Math.min(1, sample*2)) * 255);
+      g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
+      g.fillRect(this.i, 80, 1, 20)
+    }
+
+    // Show diff
+    if (diff) {
+      diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
+      g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
+      g.fillRect(this.i, 100, 1, 20)
+    }
+
+    // Show maybe
+    if (maybe) {
+      maybe = maybe > 0 ? Math.floor(Math.max(0, Math.min(1, maybe + .5)) * 255) : 0;
+      g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
+      g.fillRect(this.i, 120, 1, 20)
+    }
+
+    this.i = (i + 1) % 512;
+
   }
 
 }
