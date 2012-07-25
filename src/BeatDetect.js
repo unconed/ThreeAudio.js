@@ -383,7 +383,7 @@ ThreeAudio.BeatDetect.prototype = {
       this.debounceMaybe = 0;
 
       // Prediction is not working, use maybe beat.
-      if (!this.beat || this.beat.confidence < .3) {
+      if (!this.beat || (!data.beat.locked && this.beat.confidence < .3)) {
         // Accept as real beat and reset measure
         this.measure = 0;
         data.beat.is = true;
