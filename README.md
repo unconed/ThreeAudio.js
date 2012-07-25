@@ -14,7 +14,7 @@ ThreeAudio will read from an audio source and provide frequency/time data in the
 
 Use the included ThreeAudio.Material class to create ShaderMaterials that can read from the audio data.
 
-Includes: microevent.js (Jerome Etienne)
+Includes: microevent.js (Jerome Etienne), dsp.js (Corban Brook)
 
 *NOTE: ThreeAudio is still somewhat experimental and only Webkit Audio APIs are supported for now. Patches are welcome.*
 
