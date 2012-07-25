@@ -20,7 +20,10 @@
  * the more energy is needed to reset it. If too many beats are mispredicted, prediction stops
  * and it tries to find the beat again.
  *
- * Kinda crappy for anything but 4/4 house.
+ * If the variance between detected beats becomes small enough (minus outliers),
+ * the BPM is locked in and the autocorrelator is ignored to help ride through quiet sections.
+ *
+ * Works well for anything with a regular beat.
  *
  * Uses the levels of LevelDetect as input.
  */
@@ -390,7 +393,7 @@ ThreeAudio.BeatDetect.prototype = {
         // See how well this maybe beat matches our model
         var half = this.beat.window / 2;
         var offset = ((this.measure + half) % beatWindow) - half;
-        var jitter = this.stddev && Math.max(5, Math.min(this.stddev + 1, 10)) || 10;
+        var jitter = this.stddev && Math.max(3, Math.min(this.stddev + 1, 10)) || 10;
 
         // Realign beat if close to prediction
         if (Math.abs(offset) < jitter) {
@@ -412,6 +415,7 @@ ThreeAudio.BeatDetect.prototype = {
           else {
             // Ignore beat, prediction was early and used.
             data.beat.maybe = true;
+            this.intervals[0] += offset;
 
             // Undo penalties from last miss
             this.found = Math.min(maxFound, this.found + 1);
@@ -423,7 +427,7 @@ ThreeAudio.BeatDetect.prototype = {
           this.missed = Math.max(0, this.missed - foundBonus);
         }
         // Reset if there is a powerful enough impulse. Be more generous the more we've missed.
-        else if ((maybe > (1 + this.found*.5 - this.missed / maxPenalty))
+        else if ((maybe > (1 + this.found*.2  + .5/this.stddev - this.missed / maxPenalty))
               || (this.found == 0 || this.missed > 4)) {
           this.measure = 0;
           data.beat.is = true;
@@ -523,7 +527,7 @@ ThreeAudio.BeatDetect.prototype = {
       // Remove outliers, keep middle half.
       var working = intervals.slice();
       working.sort();
-      working = working.slice(2, 8);
+      working = working.slice(2, 10);
 
       // Calculate mean/stddev
       if (working.length > 2) {
