@@ -404,14 +404,21 @@ ThreeAudio.BeatDetect.prototype = {
             if (offset >= 0) data.beat.predicted = true;
             this.debouncePredict = 0;
 
+            this.found = Math.min(maxFound, this.found + 1);
+
             // Count as beat for interval measurement
             data.beat.adjusted = true;
           }
           else {
-            // Ignore maybe beat
+            // Ignore beat, prediction was early and used.
             data.beat.maybe = true;
+
+            // Undo penalties from last miss
+            this.found = Math.min(maxFound, this.found + 1);
+            this.missed = Math.max(0, this.missed - missedPenalty);
           }
 
+          // Give bonus for found beat
           this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
@@ -422,6 +429,7 @@ ThreeAudio.BeatDetect.prototype = {
           data.beat.is = true;
           this.debouncePredict = 0;
 
+          // Give bonus for found beat
           this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
@@ -446,12 +454,14 @@ ThreeAudio.BeatDetect.prototype = {
       // Check if prediction matches sound.
       if (predict && debounce) {
         if (maybe < 0) {
+          // Give penalty for missed beat
           this.found = Math.max(0, this.found - 1);
           this.missed = Math.min(maxPenalty, this.missed + missedPenalty);
           data.beat.missed = true;
           data.beat.predicted = true;
         }
         else {
+          // Give bonus for found beat
           this.found = Math.min(maxFound, this.found + 1);
           this.missed = Math.max(0, this.missed - foundBonus);
         }
@@ -504,24 +514,24 @@ ThreeAudio.BeatDetect.prototype = {
     if (interval) {
       var intervals = this.intervals;
 
-      // Keep track of last 16 intervals
+      // Keep track of last 12 intervals
       intervals.unshift(lastMeasure);
-      if (intervals.length > 8) {
+      if (intervals.length > 12) {
         intervals.pop();
       }
 
       // Remove outliers, keep middle half.
       var working = intervals.slice();
       working.sort();
-      working = working.slice(2, 5);
+      working = working.slice(2, 8);
 
       // Calculate mean/stddev
       if (working.length > 2) {
         var sum = 0, variance = 0;
-        l = intervals.length;
+        l = working.length;
         for (var i = 0; i < l; ++i) {
-          sum += intervals[i];
-          variance += intervals[i] * intervals[i];
+          sum += working[i];
+          variance += working[i] * working[i];
         }
         sum /= l;
         variance /= l;
