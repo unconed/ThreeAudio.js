@@ -66,6 +66,7 @@ ThreeAudio.BeatDetect = function (data) {
   this.intervals = []; // Inter-beat intervals
   this.mean = 0; // Mean of beat intervals
   this.stddev = 0; // Variance/stddev in beat intervals
+  this.jitter = 0; // Range to adjust to
   this.missed = 3;  // Missed beats score
   this.found = 0;   // Found beats score
   this.predicted = false; // Whether last predicted beat was used.
@@ -393,7 +394,7 @@ ThreeAudio.BeatDetect.prototype = {
         // See how well this maybe beat matches our model
         var half = this.beat.window / 2;
         var offset = ((this.measure + half) % beatWindow) - half;
-        var jitter = this.stddev && Math.max(3, Math.min(this.stddev + 1, 10)) || 10;
+        var jitter = this.jitter && Math.max(3, Math.min(this.jitter + 1, 10)) || 10;
 
         // Realign beat if close to prediction
         if (Math.abs(offset) < jitter) {
@@ -544,6 +545,9 @@ ThreeAudio.BeatDetect.prototype = {
         this.stddev = Math.sqrt(variance - sum*sum);
       }
     }
+
+    // Lock in on a wider range if missed
+    this.jitter = this.stddev * (1 + this.missed);
 
     // Provide decayed beat value
     this.decay = this.decay + (+data.beat.is * 2.5 - this.decay) * .4;
