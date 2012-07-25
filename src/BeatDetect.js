@@ -127,6 +127,8 @@ ThreeAudio.BeatDetect.prototype = {
     data.beat.maybe = false;
     data.beat.is = false;
     data.beat.predicted = false;
+    data.beat.locked = false;
+    data.beat.adjusted = false;
     if (this.beat) {
       data.beat.confidence = this.beat.confidence;
       data.beat.permanence = this.beat.permanence;
@@ -342,6 +344,12 @@ ThreeAudio.BeatDetect.prototype = {
         // Accept new bpm.
         this.beat = beat;
       }
+
+      // Limit BPM to a more reasonable range
+      if (this.beat.bpm > 240) {
+        this.beat.bpm /= 2;
+        this.beat.window *= 2;
+      }
     }
 
     // Constants for rejection algorithm.
@@ -354,8 +362,16 @@ ThreeAudio.BeatDetect.prototype = {
     var lastMeasure = this.measure;
 
     // Choose window for beat prediction based on accuracy
-//    var beatWindow = this.beat ? ((this.mean && (this.stddev < 3)) ? this.mean : this.beat.window) : 0;
-    var beatWindow = this.beat && this.beat.window;
+    var beatWindow = 0;
+    if (this.beat) {
+      beatWindow = this.beat.window;
+      // If beat intervals are regular, we've locked in to the beat
+      if (this.mean && (this.stddev < 2)) {
+        beatWindow = this.mean;
+        data.beat.locked = true;
+        data.beat.bpm = this.offsetToBPM(this.n / beatWindow);
+      }
+    }
 
     // Find a maybe beat to get started.
     if (maybe > 0 && lastMaybe <= 0 && this.debounceMaybe > debounceFrames) {
@@ -387,6 +403,9 @@ ThreeAudio.BeatDetect.prototype = {
             data.beat.is = true;
             if (offset >= 0) data.beat.predicted = true;
             this.debouncePredict = 0;
+
+            // Count as beat for interval measurement
+            data.beat.adjusted = true;
           }
           else {
             // Ignore maybe beat
@@ -470,12 +489,12 @@ ThreeAudio.BeatDetect.prototype = {
     // Analyse beats for consistency.
     var interval = 0;
 
-    if (data.beat.missed) {
+    // Don't check interval if beats are being missed.
+    if (this.missed > 3) {
       this.green = 0;
-      // Use autocorrelated BPM
-      interval = this.beat.window;
     }
-    else if (data.beat.is) {
+    // Measure intervals between beats
+    else if (data.beat.is || data.beat.adjusted) {
       if (this.green++) {
         // Use beat BPM
         interval = this.frames - this.lastGreen;
@@ -487,12 +506,17 @@ ThreeAudio.BeatDetect.prototype = {
 
       // Keep track of last 16 intervals
       intervals.unshift(lastMeasure);
-      if (intervals.length > 16) {
+      if (intervals.length > 8) {
         intervals.pop();
       }
 
+      // Remove outliers, keep middle half.
+      var working = intervals.slice();
+      working.sort();
+      working = working.slice(2, 5);
+
       // Calculate mean/stddev
-      if (intervals.length > 2) {
+      if (working.length > 2) {
         var sum = 0, variance = 0;
         l = intervals.length;
         for (var i = 0; i < l; ++i) {
@@ -552,8 +576,10 @@ ThreeAudio.BeatDetect.prototype = {
       });
     }
 
-    var out = [ '<strong>' + Math.round(beat.bpm * 10) / 10
-              + ' BPM (' + Math.round(100 * beat.confidence)
+    var locked = beat.locked ? ' style="color: rgb(180,255,0)"' : '';
+
+    var out = [ '<strong><span'+locked+'>' + Math.round(beat.bpm * 10) / 10
+              + ' BPM </span> (' + Math.round(100 * beat.confidence)
               + '%) P:' + Math.round(beat.permanence * 100)
               + ' µ = ' + Math.round(this.mean * 10) / 10
               + ' σ = '+ Math.round(this.stddev * 100) / 100
