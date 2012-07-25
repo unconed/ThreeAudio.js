@@ -531,7 +531,7 @@ ThreeAudio.BeatDetect.prototype = {
       working = working.slice(2, 10);
 
       // Calculate mean/stddev
-      if (working.length > 2) {
+      if (working.length > 6) {
         var sum = 0, variance = 0;
         l = working.length;
         for (var i = 0; i < l; ++i) {
@@ -547,7 +547,7 @@ ThreeAudio.BeatDetect.prototype = {
     }
 
     // Lock in on a wider range if missed
-    this.jitter = this.stddev * (1 + this.missed);
+    this.jitter = (this.stddev + this.missed * .5) * (1 + this.missed);
 
     // Provide decayed beat value
     this.decay = this.decay + (+data.beat.is * 2.5 - this.decay) * .4;
