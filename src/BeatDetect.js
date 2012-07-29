@@ -416,7 +416,6 @@ ThreeAudio.BeatDetect.prototype = {
           else {
             // Ignore beat, prediction was early and used.
             data.beat.maybe = true;
-            this.intervals[0] += offset;
 
             // Undo penalties from last miss
             this.found = Math.min(maxFound, this.found + 1);
