@@ -1,6 +1,7 @@
 #!/bin/bash
 VENDOR="
 vendor/microevent.js
+vendor/dsp.js
 "
 
 SRC="
