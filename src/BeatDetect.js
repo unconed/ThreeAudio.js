@@ -86,22 +86,25 @@ ThreeAudio.BeatDetect = function (data) {
 ThreeAudio.BeatDetect.prototype = {
   initDebug: function () {
     this.c = document.createElement('canvas');
+    this.c.className = 'ta-debug';
     this.c.width = 512;
     this.c.height = 340;
     this.c.style.position = 'absolute';
     this.c.style.zIndex = 20;
-    this.c.style.marginTop = '100px';
+    this.c.style.marginTop = '70px';
     this.g = this.c.getContext('2d');
     this.i = 0;
 
     this.t = document.createElement('div');
+    this.t.className = 'ta-debug';
     this.t.width = 256;
     this.t.height = 200;
     this.t.style.background = 'rgba(0,0,0,.3)';
     this.t.style.color = '#fff';
+    this.t.style.fontSize = '10px';
     this.t.style.position = 'absolute';
     this.t.style.zIndex = 20;
-    this.t.style.marginTop = '340px';
+    this.t.style.marginTop = '350px';
 
     document.body.appendChild(this.c);
     document.body.appendChild(this.t);
@@ -138,6 +141,11 @@ ThreeAudio.BeatDetect.prototype = {
       data.beat.permanence = this.beat.permanence;
       data.beat.bpm = this.beat.bpm;
     }
+    else {
+      data.beat.confidence = 0;
+      data.beat.permanence = 0;
+      data.beat.bpm = '';
+    }
 
     // Process energy to find impulses of sound
     var energy = levels.direct[0];
@@ -148,9 +156,9 @@ ThreeAudio.BeatDetect.prototype = {
     var signal = (this.energy - this.background) / (1 - this.background) * 3;
     this.signal = signal;
 
-    // Tweak with signal derivative, normalize and threshold for 'maybe' beat value.
+    // Normalize and threshold for 'maybe' beat value.
     var lastMaybe = this.maybe;
-    maybe = (signal * 2 - this.signal);
+    maybe = signal;
     this.maxMaybe = Math.max(this.maxMaybe * .99, maybe);
     this.maybe = maybe = maybe / Math.max(.2, this.maxMaybe) - .7;
 
@@ -615,7 +623,7 @@ ThreeAudio.BeatDetect.prototype = {
 
     // Draw graph bg
     g.fillStyle = '#000000';
-    g.fillRect(0, 140, 512, 100);
+    g.fillRect(0, 169, 512, 102);
 
     // Draw spectrum
     var max = 0;
@@ -624,9 +632,9 @@ ThreeAudio.BeatDetect.prototype = {
     }
     var norm = 1/max;
     g.beginPath();
-    g.moveTo(0, 200);
+    g.moveTo(0, 270);
     for (var i = 2; i < n/8; ++i) {
-      g.lineTo((i-2)*8, 240-(spectrum[i]*norm)*100);
+      g.lineTo((i-2)*8, 270-(spectrum[i]*norm)*100);
     }
     g.strokeStyle = '#ffffff';
     g.stroke();
@@ -636,7 +644,7 @@ ThreeAudio.BeatDetect.prototype = {
       var alpha = peak.strength *.75 + .25;
       var color = peak.active ? [Math.round(255 - 195 * peak.match), Math.round(180 + 40 * peak.match), 0].join(',') : '255,10,10';
       g.fillStyle = 'rgba('+color+','+ alpha +')';
-      g.fillRect((peak.offset - 2) * 8, 140, 1, 100);
+      g.fillRect((peak.offset - 2) * 8, 170, 1, 100);
     })
 
     // Plot levels voiceprint
@@ -648,43 +656,52 @@ ThreeAudio.BeatDetect.prototype = {
       g.fillRect(i, j, 1, 20)
       j += 20;
     }
-//      plot(levels[0]);
+
+    //plot(levels[0]);
     plot(levels[1]);
     plot(levels[2]);
     plot(levels[3]);
     plot(0);
+    plot(0);
+    plot(0);
+    plot(0);
+    plot(0);
+
+    // Show time bar
+    g.fillStyle = 'rgba(160,160,255,.85)';
+    g.fillRect(i+1, 0, 2, 120)
 
     // Show beats
     if (beat.is) {
-      g.fillStyle = beat.missed ? 'rgba(255,0,0,.5)'
-                    : (beat.maybe ? 'rgba(0,180,255,.75)'
-                    : (beat.predicted ? 'rgba(255,180,0,.75)' : 'rgba(60,220,0,.75)'));
-      g.fillRect(this.i, 0, 2, 100)
+      g.fillStyle = beat.missed ? 'rgba(255,0,0,.7)'
+                    : (beat.maybe ? 'rgba(0,180,255,.9)'
+                    : (beat.predicted ? 'rgba(255,200,0,1)' : 'rgba(60,220,0,1)'));
+      g.fillRect(this.i, 120, 2, 40)
     }
     var c = Math.round(Math.max(0, Math.min(255, beat.was * 255)));
     g.fillStyle = 'rgb('+c+','+c+','+c+')';
-    g.fillRect(412, 240, 100, 100)
+    g.fillRect(342, 270, 170, 30)
 
     // Show maybe beats
     if (beat.maybe && !beat.is) {
       g.fillStyle = 'rgba(64,64,64,.75)';
-      g.fillRect(this.i, 0, 2, 100)
+      g.fillRect(this.i, 120, 2, 40)
     }
 
     // Show sample
-    sample = Math.floor(Math.max(0, Math.min(1, sample+.5)) * 255);
-    g.fillStyle = 'rgba('+Math.round(sample*.7)+','+Math.round(sample*.8)+',' + sample +',1)';
-    g.fillRect(this.i, 80, 1, 20)
+    sample = Math.floor(Math.max(0, Math.min(1, sample*1.4+.5)) * 255);
+    g.fillStyle = 'rgba('+Math.round(sample*.2)+','+Math.round(sample*.6)+',' + sample +',1)';
+    g.fillRect(this.i, 60, 1, 20)
 
     // Show diff
     diff = Math.floor(Math.max(0, Math.min(1, diff*2)) * 255);
-    g.fillStyle = 'rgba('+diff+','+Math.round(diff*.8)+','+ Math.round(diff*.5) +',1)';
-    g.fillRect(this.i, 100, 1, 20)
+    g.fillStyle = 'rgba('+Math.round(diff*.2)+','+Math.round(diff)+','+ Math.round(diff*.5) +',1)';
+    g.fillRect(this.i, 80, 1, 20)
 
     // Show maybe
-    maybe = (beat.is || beat.maybe) ? Math.floor(Math.max(0, Math.min(1, maybe + .5)) * 255) : 0;
-    g.fillStyle = 'rgba('+Math.round(maybe*.9)+',' + maybe +','+Math.round(maybe*.5)+',1)';
-    g.fillRect(this.i, 120, 1, 20)
+    maybe = (beat.is || beat.maybe) ? Math.floor(Math.max(0, Math.min(1, maybe*1.2 + .5)) * 255) : 0;
+    g.fillStyle = 'rgba('+Math.round(maybe)+',' + maybe +','+Math.round(maybe)+',1)';
+    g.fillRect(this.i, 100, 1, 20)
 
     this.i = (i + 1) % 512;
 

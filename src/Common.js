@@ -15,7 +15,7 @@ window.ThreeAudio = window.ThreeAudio || {};
 // or pass through string if not exists.
 ThreeAudio.getShader = function (id) {
   var elem = document.getElementById(id);
-  return elem && elem.innerText || id;
+  return elem && (elem.innerText || elem.textContent) || id;
 };
 
 // Simple array/object iterator.
