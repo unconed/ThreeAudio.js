@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ThreeRTT Test</title>
+  <script type="text/javascript" charset="utf-8" src="domready.js"></script>
+  <script type="text/javascript" charset="utf-8" src="tquery-bundle.js"></script>
+  <script type="text/javascript" charset="utf-8" src="ThreeBox.js"></script>
+  <script type="text/javascript" charset="utf-8" src="../build/ThreeAudio-tquery.js"></script>
+  <script type="text/javascript" charset="utf-8">
+    DomReady.ready(function() {
+      ThreeBox.preload([
+        '../build/ThreeAudio.glsl.html',
+        '../shaders/test.glsl.html',
+      ], function () {
+        var options = {
+          cameraControls: true,
+          orbit: 7,
+          theta: 1,
+          phi: 3.14,
+        };
+        var element = document.getElementById('holder');
+
+        var world = window.world = threeBox(element, options).start();
+
+        var audio = window.audio =
+            world
+            .audio()
+            .load('test.mp3')
+            .play();
+
+        var textures = window.textures = audio.textures(512);
+
+        var material = window.material = textures.material('test-vertex', 'test-fragment');
+
+        var mesh = window.mesh = material.grid(1, 1, 512, 512).addTo(world);
+      });
+    });
+  </script>
+  <style type="text/css" media="screen">
+    * {
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    #holder {
+      width: 100%;
+      height: 100%;
+      background: #ccc;
+    }
+  </style>
+</head>
+<body>  
+  <div id="holder"></div>
+</body>
+</html>
