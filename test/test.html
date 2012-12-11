@@ -9,6 +9,12 @@
   <script type="text/javascript" charset="utf-8" src="../build/ThreeAudio-tquery.js"></script>
   <script type="text/javascript" charset="utf-8">
     DomReady.ready(function() {
+      if (!window.webkitAudioContext ||
+       !document.createElement('canvas').getContext('experimental-webgl')) {
+         document.getElementById('browser').style.display = 'block';
+         return;
+       }
+
       ThreeBox.preload([
         '../build/ThreeAudio.glsl.html',
         '../shaders/test.glsl.html',
@@ -53,7 +59,7 @@
       height: 100%;
       background: #ccc;
     }
-    #message {
+    #message, #browser {
       background: rgba(0, 0, 0, .7);
       color: #ccc;
       border-radius: 10px;
@@ -68,9 +74,17 @@
     #message a {
       color: #fff;
     }
+    #browser {
+      display: none;
+      top: 20px;
+      bottom: auto;
+      color: #ffeeee;
+      background: rgba(128, 0, 20, .7);
+    }
   </style>
 </head>
-<body>  
+<body>
+  <div id="browser">This demo only works in Chrome or Safari, with WebGL enabled.</div>
   <div id="holder"></div>
   <div id="message">This is the face hidden in the Aphex Twin track Equation, revealed on a logarithmic spectrogram.<br><br>
     <a href="https://github.com/unconed/ThreeAudio.js/blob/master/test/test.html">Source</a> &middot; <a href="https://github.com/unconed/ThreeAudio.js/blob/master/shaders/test.glsl.html">Shaders</a>
