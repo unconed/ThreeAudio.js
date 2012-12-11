@@ -1,5 +1,5 @@
 <!-- audio material shader -->
-<script type="application/x-glsl" id="vis-vertex">
+<script type="application/x-glsl" id="test-vertex">
 
 // Audio data textures
 uniform sampler2D freqData;
@@ -30,9 +30,9 @@ void main() {
 
   // Render time data on a grid.
   vec3 pos = vec3(
-    position.x,
-    position.z + texture2D(timeData, audioUV).a * 1.0 - .5,
-    -position.y);
+    log(uv.x) + 2.2,
+    position.z + texture2D(freqData, audioUV).a * 1.0 - .5,
+    -position.y * 4.0);
 
   // Pass correct UV offset to fragment shader.
   vAudioUV = audioUV;
@@ -44,7 +44,7 @@ void main() {
 }
 </script>
 
-<script type="application/x-glsl" id="vis-fragment">
+<script type="application/x-glsl" id="test-fragment">
 
 // Audio data textures
 uniform sampler2D freqData;
@@ -69,8 +69,13 @@ varying vec2 vUV;
 varying vec2 vAudioUV;
 
 void main() {
-  float alpha = texture2D(timeData, vAudioUV).a * 2.0 - .5;
-  vec4 color = vec4(vUV.x, vUV.y * alpha, alpha, 1.0);
+  float alpha = texture2D(freqData, vAudioUV).a;
+  float hue = -alpha * 6.0 - 1.0;
+  float r = sin(hue);
+  float g = sin(hue+2.08);
+  float b = sin(hue+4.16);
+  vec3 rgb = vec3(r, g, b) * .5 + .5;
+  vec4 color = vec4(alpha * 1.5 * rgb, 1.0);
 
   gl_FragColor = color;
 }

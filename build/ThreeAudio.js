@@ -996,8 +996,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
 
     uniforms[key + 'Data'] = {
       type: 't',
-      texture: textureObject,
-      value: i++//,
+      value: textureObject//,
     };
   });
 
@@ -1005,8 +1004,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   _.each(textures || [], function (texture, key) {
     uniforms[key] = {
       type: 't',
-      value: i++,
-      texture: ThreeAudio.toTexture(texture)//,
+      value: ThreeAudio.toTexture(texture)//,
     };
   });
 

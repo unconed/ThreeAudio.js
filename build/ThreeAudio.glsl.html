@@ -31,8 +31,8 @@ void main() {
   // Render time data on a grid.
   vec3 pos = vec3(
     position.x,
-    position.y + texture2D(timeData, audioUV).a * 1.0 - .5,
-    position.z);
+    position.z + texture2D(timeData, audioUV).a * 1.0 - .5,
+    -position.y);
 
   // Pass correct UV offset to fragment shader.
   vAudioUV = audioUV;

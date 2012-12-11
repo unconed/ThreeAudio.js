@@ -24,6 +24,7 @@ Builds:
 
  * ThreeAudio: microevent + core
  * ThreeAudio-tquery: microevent + core + tQuery plug-in
+ * ThreeAudio.glsl.html: required GLSL shaders
 
 Basic Usage
 -----

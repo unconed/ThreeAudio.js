@@ -996,8 +996,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
 
     uniforms[key + 'Data'] = {
       type: 't',
-      texture: textureObject,
-      value: i++//,
+      value: textureObject//,
     };
   });
 
@@ -1005,8 +1004,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   _.each(textures || [], function (texture, key) {
     uniforms[key] = {
       type: 't',
-      value: i++,
-      texture: ThreeAudio.toTexture(texture)//,
+      value: ThreeAudio.toTexture(texture)//,
     };
   });
 
@@ -1939,14 +1937,14 @@ ThreeAudio.BeatDetect.prototype = {
 /**
  * Create an audio source.
  */
-tQuery.World.register('audio', function (fftSize) {
+tQuery.World.registerInstance('audio', function (fftSize) {
   return tQuery.createAudioSource(this, fftSize);
 });
 
 /**
  * Create an audio source.
  */
-tQuery.register('createAudioSource', function (world, fftSize) {
+tQuery.registerStatic('createAudioSource', function (world, fftSize) {
   // Create source
   var source = new ThreeAudio.Source(fftSize);
 
@@ -1961,7 +1959,7 @@ tQuery.register('createAudioSource', function (world, fftSize) {
 /**
  * Create a set of audio textures for sound data.
  */
-tQuery.register('createAudioTextures', function (world, source, history) {
+tQuery.registerStatic('createAudioTextures', function (world, source, history) {
   var audioTextures = new ThreeAudio.Textures(world.tRenderer(), source, history);
 
   // Add .material() method.
@@ -1982,7 +1980,7 @@ tQuery.register('createAudioTextures', function (world, source, history) {
 /**
  * Create an audio material for shading sound data.
  */
-tQuery.register('createAudioMaterial',
+tQuery.registerStatic('createAudioMaterial',
   function (audioTextures, vertexShader, fragmentShader, textures, uniforms, attributes) {
     var material = new ThreeAudio.Material(
       audioTextures,
@@ -2005,7 +2003,7 @@ tQuery.register('createAudioMaterial',
 /**
  * Create an audio grid for rendering sound data with.
  */
-tQuery.register('createAudioGrid', function (textures, width, depth, segmentsW, segmentsH, material) {
+tQuery.registerStatic('createAudioGrid', function (textures, width, depth, segmentsW, segmentsH, material) {
   var defaults  = [textures, 1, 1, 0, 0];
   for (i in defaults) {
     arguments[i] = arguments[i] || defaults[i];
