@@ -13,7 +13,9 @@ ThreeAudio.Source.prototype = {
     var c = this.context = new webkitAudioContext();
 
     // Create source
-    this.source = c.createBufferSource();
+    this.element = new Audio();
+    this.element.preload = 'auto';
+    this.source = c.createMediaElementSource(this.element);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -133,33 +135,29 @@ ThreeAudio.Source.prototype = {
         source = this.source,
         that = this;
 
-    // Load file via AJAX
-    var request = new XMLHttpRequest();
-    request.open("GET", url, true);
-    request.responseType = "arraybuffer";
-
-    request.onload = function() {
-      // Link databuffer to source
-      var buffer = context.createBuffer(request.response, false);
-      source.buffer = buffer;
-      source.loop = true;
-
+    var ping = function () {
       // Begin playback if requested earlier.
       if (that.playing) {
         that._play();
       }
 
+      // Remove event listener
+      that.element.removeEventListener('canplaythrough', ping);
+
+      // Fire callback
       callback && callback();
     };
 
-    request.send();
+    // Add event listener for when loading is complete
+    this.element.addEventListener('canplaythrough', ping);
+    this.element.src = url;
 
     return this;
   },
 
   play: function () {
     this.playing = true;
-    if (this.source.buffer) {
+    if (this.element.readyState == 4) {
       this._play();
     }
     return this;
@@ -167,18 +165,18 @@ ThreeAudio.Source.prototype = {
 
   stop: function () {
     this.playing = false;
-    if (this.source.buffer) {
+    if (this.element.readyState == 4) {
       this._stop();
     }
     return this;
   },
 
   _play: function () {
-    this.source.noteOn(0);
+    this.element.play();
   },
 
   _stop: function () {
-    this.source.noteOff(0);
+    this.element.pause();
   }//,
 
 };

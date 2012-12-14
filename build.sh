@@ -24,8 +24,9 @@ shaders/shaders.glsl.html
 
 cat $VENDOR $SRC > build/ThreeAudio.js
 cat $VENDOR $SRC $TQUERY > build/ThreeAudio-tquery.js
-cat $SHADERS > build/shaders.glsl.html
+cat $SHADERS > build/ThreeAudio.glsl.html
 
+if [ -z "$SKIP_MINIFY" ]; then
 curl --data-urlencode "js_code@build/ThreeAudio.js" 	\
 	-d "output_format=text&output_info=compiled_code&compilation_level=SIMPLE_OPTIMIZATIONS" \
 	http://closure-compiler.appspot.com/compile	\
@@ -35,3 +36,4 @@ curl --data-urlencode "js_code@build/ThreeAudio-tquery.js" 	\
 	-d "output_format=text&output_info=compiled_code&compilation_level=SIMPLE_OPTIMIZATIONS" \
 	http://closure-compiler.appspot.com/compile	\
 	> build/ThreeAudio-tquery.min.js
+fi
