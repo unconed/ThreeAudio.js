@@ -12,14 +12,13 @@ ThreeAudio.Source.prototype = {
   init: function () {
     var c = this.context = new webkitAudioContext();
 
-    // Abstract source
-    this.source = c.createDelayNode();
+    // Abstract sources, use a 0 delay node.
+    this.audible = c.createDelayNode();
+    this.inaudible = c.createDelayNode();
 
-    // Create media source
-    this.element = new Audio();
-    this.element.preload = 'auto';
-    this.mediaElementSource = c.createMediaElementSource(this.element);
-    this.mediaElementSource.connect(this.source);
+    // Create buffer source
+    this.bufferSource = c.createBufferSource();
+    this.bufferSource.connect(this.audible);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -74,14 +73,20 @@ ThreeAudio.Source.prototype = {
     this.delay.delayTime.value = this.fftSize * 2 / c.sampleRate;
 
     // Connect main audio processing pipe
-    this.source.connect(this.analyser);
-    this.analyser.connect(this.delay);
+    this.audible.connect(this.analyser);
+    this.inaudible.connect(this.analyser);
+
+    // Connect audible output through
+    this.audible.connect(this.delay);
     this.delay.connect(c.destination);
 
     // Connect secondary filters + analysers + gain.
-    var source = this.source;
+    var audible = this.audible,
+        inaudible = this.inaudible;
     _.each(filters, function (filter) {
-      source.connect(filter.delayNode);
+      audible.connect(filter.delayNode);
+      inaudible.connect(filter.delayNode);
+
       filter.delayNode.connect(filter);
       filter.connect(filter.gainNode);
       filter.gainNode.connect(filter.analyser);
@@ -135,14 +140,14 @@ ThreeAudio.Source.prototype = {
   },
 
   mic: function (callback) {
-    var c = this.context, source = this.source;
+    var c = this.context, inaudible = this.inaudible;
     try {
       navigator.webkitGetUserMedia({
           audio: true
         }, function (stream) {
           // Create an AudioNode from the stream.
           var mediaStreamSource = this.mediaStreamSource = c.createMediaStreamSource(stream);
-          mediaStreamSource.connect(source);
+          mediaStreamSource.connect(inaudible);
 
           callback && callback();
         });
@@ -153,32 +158,36 @@ ThreeAudio.Source.prototype = {
 
   load: function (url, callback) {
     var context = this.context,
-        source = this.source,
+        source = this.bufferSource,
         that = this;
 
-    var ping = function () {
+    // Load file via AJAX
+    var request = new XMLHttpRequest();
+    request.open("GET", url, true);
+    request.responseType = "arraybuffer";
+
+    request.onload = function() {
+      // Link databuffer to source
+      var buffer = context.createBuffer(request.response, false);
+      source.buffer = buffer;
+      source.loop = true;
+
       // Begin playback if requested earlier.
       if (that.playing) {
         that._play();
       }
 
-      // Remove event listener
-      that.element.removeEventListener('canplaythrough', ping);
-
-      // Fire callback
       callback && callback();
     };
 
-    // Add event listener for when loading is complete
-    this.element.addEventListener('canplaythrough', ping);
-    this.element.src = url;
+    request.send();
 
     return this;
   },
 
   play: function () {
     this.playing = true;
-    if (this.element.readyState == 4) {
+    if (this.bufferSource.buffer) {
       this._play();
     }
     return this;
@@ -186,18 +195,18 @@ ThreeAudio.Source.prototype = {
 
   stop: function () {
     this.playing = false;
-    if (this.element.readyState == 4) {
+    if (this.bufferSource.buffer) {
       this._stop();
     }
     return this;
   },
 
   _play: function () {
-    this.element.play();
+    this.bufferSource.noteOn(0);
   },
 
   _stop: function () {
-    this.element.pause();
+    this.bufferSource.noteOff(0);
   }//,
 
 };
