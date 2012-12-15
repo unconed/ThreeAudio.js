@@ -92,6 +92,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.c.style.position = 'absolute';
     this.c.style.zIndex = 20;
     this.c.style.marginTop = '70px';
+    this.c.style.top = 0;
     this.g = this.c.getContext('2d');
     this.i = 0;
 
@@ -105,6 +106,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.t.style.position = 'absolute';
     this.t.style.zIndex = 20;
     this.t.style.marginTop = '350px';
+    this.c.style.top = 0;
 
     document.body.appendChild(this.c);
     document.body.appendChild(this.t);

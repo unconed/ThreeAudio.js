@@ -1,7 +1,19 @@
-ThreeAudio.Source = function (fftSize) {
-  this.fftSize = fftSize || 1024;
+ThreeAudio.Source = function (options) {
+  if (typeof options == 'number') {
+    options = { fftSize: options };
+  }
+  options = _.extend({
+    fftSize: 1024,
+    levels: true,
+    beats: true,
+  }, options);
+
+  this.fftSize = options.fftSize;
+  this.levels = options.levels;
+  this.beats = options.beats;
 
   this.filters = {};
+  this.buffer = null;
   this.playing = false;
 
   this.init();
@@ -15,10 +27,6 @@ ThreeAudio.Source.prototype = {
     // Abstract sources, use a 0 delay node.
     this.audible = c.createDelayNode();
     this.inaudible = c.createDelayNode();
-
-    // Create buffer source
-    this.bufferSource = c.createBufferSource();
-    this.bufferSource.connect(this.audible);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -107,10 +115,14 @@ ThreeAudio.Source.prototype = {
     };
 
     // Create levels detector
-    this.levelDetect = new ThreeAudio.LevelDetect(this.data);
+    if (this.levels) {
+      this.levelDetect = new ThreeAudio.LevelDetect(this.data);
+    }
 
     // Create beat detector
-    this.beatDetect = new ThreeAudio.BeatDetect(this.data);
+    if (this.beats) {
+      this.beatDetect = new ThreeAudio.BeatDetect(this.data);
+    }
   },
 
   update: function () {
@@ -127,10 +139,10 @@ ThreeAudio.Source.prototype = {
     });
 
     // Update level detector.
-    this.levelDetect.analyse();
+    this.levels && this.levelDetect.analyse();
 
     // Update beat detector.
-    this.beatDetect.analyse();
+    this.beats && this.beatDetect.analyse();
 
     return this;
   },
@@ -158,7 +170,6 @@ ThreeAudio.Source.prototype = {
 
   load: function (url, callback) {
     var context = this.context,
-        source = this.bufferSource,
         that = this;
 
     // Load file via AJAX
@@ -168,9 +179,7 @@ ThreeAudio.Source.prototype = {
 
     request.onload = function() {
       // Link databuffer to source
-      var buffer = context.createBuffer(request.response, false);
-      source.buffer = buffer;
-      source.loop = true;
+      that.buffer = context.createBuffer(request.response, false);
 
       // Begin playback if requested earlier.
       if (that.playing) {
@@ -187,7 +196,7 @@ ThreeAudio.Source.prototype = {
 
   play: function () {
     this.playing = true;
-    if (this.bufferSource.buffer) {
+    if (this.buffer) {
       this._play();
     }
     return this;
@@ -195,18 +204,24 @@ ThreeAudio.Source.prototype = {
 
   stop: function () {
     this.playing = false;
-    if (this.bufferSource.buffer) {
+    if (this.buffer) {
       this._stop();
     }
     return this;
   },
 
   _play: function () {
+    // Create buffer source
+    this.bufferSource = this.context.createBufferSource();
+    this.bufferSource.connect(this.audible);
+    this.bufferSource.buffer = this.buffer;
+
     this.bufferSource.noteOn(0);
   },
 
   _stop: function () {
     this.bufferSource.noteOff(0);
+    this.bufferSource.disconnect(0);
   }//,
 
 };
