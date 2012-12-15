@@ -32,8 +32,9 @@
         var audio = window.audio =
             world
             .audio()
-            .load('test.mp3')
-            .play();
+            .mic()
+//            .load('test.mp3')
+//            .play();
 
         var textures = window.textures = audio.textures(512);
 

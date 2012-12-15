@@ -12,10 +12,14 @@ ThreeAudio.Source.prototype = {
   init: function () {
     var c = this.context = new webkitAudioContext();
 
-    // Create source
+    // Abstract source
+    this.source = c.createDelayNode();
+
+    // Create media source
     this.element = new Audio();
     this.element.preload = 'auto';
-    this.source = c.createMediaElementSource(this.element);
+    this.mediaElementSource = c.createMediaElementSource(this.element);
+    this.mediaElementSource.connect(this.source);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -128,6 +132,23 @@ ThreeAudio.Source.prototype = {
 
   size: function () {
     return this.analyser.frequencyBinCount;
+  },
+
+  mic: function (callback) {
+    var c = this.context, source = this.source;
+    try {
+      navigator.webkitGetUserMedia({
+          audio: true
+        }, function (stream) {
+          // Create an AudioNode from the stream.
+          var mediaStreamSource = this.mediaStreamSource = c.createMediaStreamSource(stream);
+          mediaStreamSource.connect(source);
+
+          callback && callback();
+        });
+    } catch (e) { };
+
+    return this;
   },
 
   load: function (url, callback) {
