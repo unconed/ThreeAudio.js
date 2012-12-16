@@ -33,19 +33,19 @@ Basic Usage
 
 Create an audio source, load a file and request playback when ready.
 
-```
+```javascript
 var audioSource = (new ThreeAudio.Source()).load('/audio/file.mp3').play();
 ```
 
 Create textures to hold the audio data, passing in the Three.js renderer and the audio source.
 
-```
+```javascript
 var audioTextures = new ThreeAudio.Textures(renderer, audioSource);
 ```  
 
 Create a material that uses the audio data, passing in the audio textures, a vertex/fragment shader program, as well as any other textures, uniforms and attributes you wish to use (as objects with key/value pairs). Specify a literal vertex/fragment program, or the ID of a script tag that contains the source code for the program.
 
-```
+```javascript
 var audioMaterial = new ThreeAudio.Material(audioTextures, vertexShader, fragmentShader);
 // Or
 var audioMaterial = new ThreeAudio.Material(audioTextures, vertexShader, fragmentShader, textures, uniforms, attributes);
@@ -53,7 +53,7 @@ var audioMaterial = new ThreeAudio.Material(audioTextures, vertexShader, fragmen
 
 Apply the material to a mesh and insert it into your scene. Use `GridGeometry` to get a plane with UV coordinates that are perfectly aligned with data samples.
 
-```
+```javascript
 // Sample entire data set
 var geometry = new ThreeAudio.GridGeometry(audioTextures, 100, 100);
 // OR: 16 frequency/time samples and 5 history samples
@@ -66,7 +66,7 @@ scene.add(audioMesh);
 
 Update the audio textures every frame before render.
 
-```
+```javascript
 audioTextures.update()
 ```
 
@@ -74,13 +74,13 @@ audioTextures.update()
 
 Create an audio source and start playing.
 
-```
+```javascript
 var audio = world.audio().load('/audio/file.mp3').play();
 ```
 
 Create audio textures, make a material out of them with given shaders, and bind it to a mesh. Use .grid() on the material to get a planar grid ready for rendering.
 
-```
+```javascript
 var mesh = audio.textures().material(vertexShader, fragmentShader).grid().addTo(world);
 ```
 
