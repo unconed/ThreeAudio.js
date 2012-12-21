@@ -768,6 +768,7 @@ ThreeAudio.Source = function (options) {
   this.filters = {};
   this.buffer = null;
   this.playing = false;
+  this.seek = 0;
 
   this.init();
 }
@@ -921,6 +922,17 @@ ThreeAudio.Source.prototype = {
     return this;
   },
 
+  immediate: function (data) {
+    // Link databuffer to source
+    this.buffer = this.context.createBuffer(data, false);
+    // Begin playback if requested earlier.
+    if (this.playing) {
+      that._play();
+    }
+
+    return this;
+  },
+
   load: function (url, callback) {
     var context = this.context,
         that = this;
@@ -948,6 +960,8 @@ ThreeAudio.Source.prototype = {
   },
 
   play: function () {
+    if (this.playing) return;
+
     this.playing = true;
     if (this.buffer) {
       this._play();
@@ -956,6 +970,8 @@ ThreeAudio.Source.prototype = {
   },
 
   stop: function () {
+    if (!this.playing) return;
+
     this.playing = false;
     if (this.buffer) {
       this._stop();
@@ -970,12 +986,17 @@ ThreeAudio.Source.prototype = {
     this.bufferSource.buffer = this.buffer;
 
     this.bufferSource.noteOn(0);
+    this.startTime = +new Date() - this.seek;
   },
 
   _stop: function () {
     this.bufferSource.noteOff(0);
     this.bufferSource.disconnect(0);
-  }//,
+  },
+
+  time: function () {
+    return this.startTime ? +new Date() - this.startTime : 0;
+  },
 
 };
 
