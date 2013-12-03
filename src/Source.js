@@ -1,20 +1,62 @@
-ThreeAudio.Source = function (fftSize) {
+ThreeAudio.Source = function (fftSize, element, detectors) {
   this.fftSize = fftSize || 1024;
+  this.detectors = detectors || [ThreeAudio.LevelDetect, ThreeAudio.BeatDetect];
 
   this.filters = {};
   this.playing = false;
+  this.processingDelay = 0;
 
-  this.init();
+  if (!(webkitAudioContext || AudioContext)) {
+    throw "Web Audio API not supported";
+  }
+  else {
+    this.initElement(element);
+  }
 }
 
 ThreeAudio.Source.prototype = {
 
-  init: function () {
-    var c = this.context = new webkitAudioContext();
+  initElement: function (element) {
+    var c = this.context = new (webkitAudioContext || AudioContext)();
 
     // Create source
-    this.element = new Audio();
-    this.element.preload = 'auto';
+    if (element) {
+      this.element = element;
+    }
+    else {
+      this.element = new Audio();
+      this.element.preload = 'auto';
+    }
+
+    // Create buffers for time/freq data.
+    this.samples = this.fftSize / 2;
+    this.data = {
+      // High resolution FFT for frequency / time data
+      freq: new Uint8Array(this.samples),
+      time: new Uint8Array(this.samples),
+      // Low resolution filtered signals, time data only.
+      filter: {
+        bass: new Uint8Array(this.samples),
+        mid: new Uint8Array(this.samples),
+        treble: new Uint8Array(this.samples)//,
+      }//,
+    };
+
+    // Wait for audio metadata before initializing analyzer
+    if (this.element.readyState >= 3) {
+      this.initAnalyzer();
+    }
+    else {
+      this.element.addEventListener('canplay', function () {
+        this.initAnalyzer();
+      }.bind(this));
+    }
+
+  },
+
+  initAnalyzer: function () {
+    var c = this.context;
+
     this.source = c.createMediaElementSource(this.element);
 
     // Create main analyser
@@ -67,7 +109,8 @@ ThreeAudio.Source.prototype = {
 
     // Create playback delay to compensate for FFT lag.
     this.delay = c.createDelayNode();
-    this.delay.delayTime.value = this.fftSize * 2 / c.sampleRate;
+    this.processingDelay = this.fftSize * 2 / c.sampleRate;
+    this.delay.delayTime.value = this.processingDelay;
 
     // Connect main audio processing pipe
     this.source.connect(this.analyser);
@@ -83,45 +126,31 @@ ThreeAudio.Source.prototype = {
       filter.gainNode.connect(filter.analyser);
     });
 
-    // Create buffers for time/freq data.
-    this.samples = this.analyser.frequencyBinCount;
-    this.data = {
-      // High resolution FFT for frequency / time data
-      freq: new Uint8Array(this.samples),
-      time: new Uint8Array(this.samples),
-      // Low resolution filtered signals, time data only.
-      filter: {
-        bass: new Uint8Array(this.samples),
-        mid: new Uint8Array(this.samples),
-        treble: new Uint8Array(this.samples)//,
-      }//,
-    };
-
-    // Create levels detector
-    this.levelDetect = new ThreeAudio.LevelDetect(this.data);
-
-    // Create beat detector
-    this.beatDetect = new ThreeAudio.BeatDetect(this.data);
+    // Create detectors
+    this.detectors = _.map(this.detectors, function (klass) {
+      return (new klass(this.data));
+    }.bind(this));
   },
 
   update: function () {
     var a = this.analyser, d = this.data;
 
-    // Get freq/time data.
-    a.smoothingTimeConstant = 0;
-    a.getByteFrequencyData(d.freq);
-    a.getByteTimeDomainData(d.time);
+    if (a) {
+      // Get freq/time data.
+      a.smoothingTimeConstant = 0;
+      a.getByteFrequencyData(d.freq);
+      a.getByteTimeDomainData(d.time);
 
-    // Get filtered signals.
-    _.each(this.filters, function (filter) {
-      filter.analyser.getByteTimeDomainData(d.filter[filter.key]);
-    });
+      // Get filtered signals.
+      _.each(this.filters, function (filter) {
+        filter.analyser.getByteTimeDomainData(d.filter[filter.key]);
+      });
 
-    // Update level detector.
-    this.levelDetect.analyse();
-
-    // Update beat detector.
-    this.beatDetect.analyse();
+      // Update detectors.
+      _.each(this.detectors, function (det) {
+        det.analyse();
+      });
+    }
 
     return this;
   },

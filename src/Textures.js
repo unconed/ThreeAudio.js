@@ -44,6 +44,7 @@ ThreeAudio.Textures.prototype = {
         for (var i = 0; i < d.length * history; ++i) empty[i] = 128;
       }
 
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, d.length, history, 0, gl.ALPHA, gl.UNSIGNED_BYTE, empty);
     });
   },
@@ -82,11 +83,11 @@ ThreeAudio.Textures.prototype = {
     var levels = this.data.levels,
         beat = this.data.beat;
     return {
-      audioIsBeat:       beat.is,
-      audioWasBeat:      beat.was, 
-      audioLevels:       levels.direct,
-      audioLevelsSmooth: levels.smooth,
-      audioLevelsChange: levels.change,
+      audioIsBeat:       beat && beat.is,
+      audioWasBeat:      beat && beat.was, 
+      audioLevels:       levels && levels.direct,
+      audioLevelsSmooth: levels && levels.smooth,
+      audioLevelsChange: levels && levels.change,
       audioOffset:       this.timeIndex / this.history,
       audioStep: {
         x: 1 / (this.source.samples - 1),

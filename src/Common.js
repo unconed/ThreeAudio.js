@@ -1,6 +1,6 @@
 // Check dependencies.
 (function (deps) {
-  for (i in deps) {
+  for (var i in deps) {
     if (!window[i]) throw "Error: ThreeAudio requires " + deps[i];
   }
 })({
