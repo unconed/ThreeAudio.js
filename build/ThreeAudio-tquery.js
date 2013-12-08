@@ -1965,16 +1965,16 @@ ThreeAudio.BeatDetect.prototype = {
 /**
  * Create an audio source.
  */
-tQuery.World.registerInstance('audio', function (fftSize) {
+tQuery.World.registerInstance('audio', function (fftSize, element, detectors) {
   return tQuery.createAudioSource(this, fftSize);
 });
 
 /**
  * Create an audio source.
  */
-tQuery.registerStatic('createAudioSource', function (world, fftSize) {
+tQuery.registerStatic('createAudioSource', function (world, fftSize, element, detectors) {
   // Create source
-  var source = new ThreeAudio.Source(fftSize);
+  var source = new ThreeAudio.Source(fftSize, element, detectors);
 
   // Add .textures() method.
   source.textures = function (history) {
