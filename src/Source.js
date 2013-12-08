@@ -1,16 +1,24 @@
-ThreeAudio.Source = function (fftSize, element, detectors) {
-  this.fftSize = fftSize || 1024;
-  this.detectors = detectors || [ThreeAudio.LevelDetect, ThreeAudio.BeatDetect];
+ThreeAudio.Source = function (options) {
+  if (typeof options == 'number') {
+    options = { fftSize: options };
+  }
+  options = _.extend({
+    fftSize: 1024,
+    detectors: [ThreeAudio.LevelDetect, ThreeAudio.BeatDetect],
+  }, options);
+
+  this.fftSize = options.fftSize;
 
   this.filters = {};
   this.playing = false;
+
   this.processingDelay = 0;
 
   if (!(webkitAudioContext || AudioContext)) {
     throw "Web Audio API not supported";
   }
   else {
-    this.initElement(element);
+    this.initElement(options.element);
   }
 }
 
@@ -42,6 +50,10 @@ ThreeAudio.Source.prototype = {
       }//,
     };
 
+    // Create audible/inaudible inputs for analysis
+    this.audible = c.createDelayNode();
+    this.inaudible = c.createDelayNode();
+
     // Wait for audio metadata before initializing analyzer
     if (this.element.readyState >= 3) {
       this.initAnalyzer();
@@ -58,6 +70,7 @@ ThreeAudio.Source.prototype = {
     var c = this.context;
 
     this.source = c.createMediaElementSource(this.element);
+    this.source.connect(this.audible);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -113,14 +126,20 @@ ThreeAudio.Source.prototype = {
     this.delay.delayTime.value = this.processingDelay;
 
     // Connect main audio processing pipe
-    this.source.connect(this.analyser);
-    this.analyser.connect(this.delay);
+    this.audible.connect(this.analyser);
+    this.inaudible.connect(this.analyser);
+
+    // Connect audible output through
+    this.audible.connect(this.delay);
     this.delay.connect(c.destination);
 
     // Connect secondary filters + analysers + gain.
-    var source = this.source;
+    var audible = this.audible,
+        inaudible = this.inaudible;
     _.each(filters, function (filter) {
-      source.connect(filter.delayNode);
+      audible.connect(filter.delayNode);
+      inaudible.connect(filter.delayNode);
+
       filter.delayNode.connect(filter);
       filter.connect(filter.gainNode);
       filter.gainNode.connect(filter.analyser);
@@ -151,6 +170,27 @@ ThreeAudio.Source.prototype = {
         det.analyse();
       });
     }
+
+    return this;
+  },
+
+  size: function () {
+    return this.analyser.frequencyBinCount;
+  },
+
+  mic: function (callback) {
+    var c = this.context, inaudible = this.inaudible;
+    try {
+      navigator.webkitGetUserMedia({
+          audio: true
+        }, function (stream) {
+          // Create an AudioNode from the stream.
+          var mediaStreamSource = this.mediaStreamSource = c.createMediaStreamSource(stream);
+          mediaStreamSource.connect(inaudible);
+
+          callback && callback();
+        });
+    } catch (e) { };
 
     return this;
   },
@@ -201,12 +241,17 @@ ThreeAudio.Source.prototype = {
   },
 
   _play: function () {
+    this.startTime = (+new Date() / 1000) - this.element.currentTime;
     this.element.play();
   },
 
   _stop: function () {
     this.element.pause();
-  }//,
+  },
+
+  time: function () {
+    return this.startTime ? ((+new Date() / 1000) - this.startTime) : 0;
+  },
 
 };
 

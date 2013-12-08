@@ -52,7 +52,7 @@ tQuery.registerStatic('createAudioMaterial',
       fragmentShader,
       textures,
       uniforms,
-      attributes//,
+      attributes
     );
 
     // Add .grid() method.

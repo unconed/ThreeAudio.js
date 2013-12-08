@@ -83,18 +83,18 @@ ThreeAudio.Textures.prototype = {
     var levels = this.data.levels,
         beat = this.data.beat;
     return {
-      audioIsBeat:       beat && beat.is,
-      audioWasBeat:      beat && beat.was, 
-      audioLevels:       levels && levels.direct,
-      audioLevelsSmooth: levels && levels.smooth,
-      audioLevelsChange: levels && levels.change,
+      audioIsBeat:       beat && beat.is || 0,
+      audioWasBeat:      beat && beat.was || 0, 
+      audioLevels:       levels && levels.direct || 0,
+      audioLevelsSmooth: levels && levels.smooth || 0,
+      audioLevelsChange: levels && levels.change || 0,
       audioOffset:       this.timeIndex / this.history,
       audioStep: {
         x: 1 / (this.source.samples - 1),
-        y: 1 / this.history//,
-      }//,
+        y: 1 / this.history,
+      },
     };
-  }//,
+  },
 }
 
 // Event emitter

@@ -8,32 +8,32 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   uniforms = _.extend(uniforms || {}, {
     audioIsBeat: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioWasBeat: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioLevels: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioLevelsSmooth: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioLevelsChange: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioOffset: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioStep: {
       type: 'v2',
-      value: { x: 0, y: 0 }//,
-    }//,
+      value: { x: 0, y: 0 },
+    },
   });
 
   // Generate uniforms for freq/time textures
@@ -47,7 +47,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
       THREE.ClampToEdgeWrapping,
       THREE.RepeatWrapping,
       THREE.NearestFilter,
-      THREE.NearestFilter//,
+      THREE.NearestFilter
     );
 
     // Pre-init texture to trick WebGLRenderer
@@ -56,7 +56,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
 
     uniforms[key + 'Data'] = {
       type: 't',
-      value: textureObject//,
+      value: textureObject,
     };
   });
 
@@ -64,7 +64,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   _.each(textures || [], function (texture, key) {
     uniforms[key] = {
       type: 't',
-      value: ThreeAudio.toTexture(texture)//,
+      value: ThreeAudio.toTexture(texture),
     };
   });
 
@@ -81,6 +81,6 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
     attributes:     attributes,
     uniforms:       uniforms,
     vertexShader:   ThreeAudio.getShader(vertexShader),
-    fragmentShader: ThreeAudio.getShader(fragmentShader)//,
+    fragmentShader: ThreeAudio.getShader(fragmentShader),
   });
 };

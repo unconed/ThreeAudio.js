@@ -697,7 +697,7 @@ RFFT.prototype.forward = function(buffer) {
   }
 })({
   'THREE': 'Three.js',
-  'MicroEvent': 'MicroEvent.js'//,
+  'MicroEvent': 'MicroEvent.js',
 });
 
 // Namespace
@@ -751,19 +751,27 @@ ThreeAudio.toTexture = function (texture) {
 // Math!
 var π = Math.PI,
     τ = π * 2;
-ThreeAudio.Source = function (fftSize, element, detectors) {
-  this.fftSize = fftSize || 1024;
-  this.detectors = detectors || [ThreeAudio.LevelDetect, ThreeAudio.BeatDetect];
+ThreeAudio.Source = function (options) {
+  if (typeof options == 'number') {
+    options = { fftSize: options };
+  }
+  options = _.extend({
+    fftSize: 1024,
+    detectors: [ThreeAudio.LevelDetect, ThreeAudio.BeatDetect],
+  }, options);
+
+  this.fftSize = options.fftSize;
 
   this.filters = {};
   this.playing = false;
+
   this.processingDelay = 0;
 
   if (!(webkitAudioContext || AudioContext)) {
     throw "Web Audio API not supported";
   }
   else {
-    this.initElement(element);
+    this.initElement(options.element);
   }
 }
 
@@ -795,6 +803,10 @@ ThreeAudio.Source.prototype = {
       }//,
     };
 
+    // Create audible/inaudible inputs for analysis
+    this.audible = c.createDelayNode();
+    this.inaudible = c.createDelayNode();
+
     // Wait for audio metadata before initializing analyzer
     if (this.element.readyState >= 3) {
       this.initAnalyzer();
@@ -811,6 +823,7 @@ ThreeAudio.Source.prototype = {
     var c = this.context;
 
     this.source = c.createMediaElementSource(this.element);
+    this.source.connect(this.audible);
 
     // Create main analyser
     this.analyser = c.createAnalyser();
@@ -866,14 +879,20 @@ ThreeAudio.Source.prototype = {
     this.delay.delayTime.value = this.processingDelay;
 
     // Connect main audio processing pipe
-    this.source.connect(this.analyser);
-    this.analyser.connect(this.delay);
+    this.audible.connect(this.analyser);
+    this.inaudible.connect(this.analyser);
+
+    // Connect audible output through
+    this.audible.connect(this.delay);
     this.delay.connect(c.destination);
 
     // Connect secondary filters + analysers + gain.
-    var source = this.source;
+    var audible = this.audible,
+        inaudible = this.inaudible;
     _.each(filters, function (filter) {
-      source.connect(filter.delayNode);
+      audible.connect(filter.delayNode);
+      inaudible.connect(filter.delayNode);
+
       filter.delayNode.connect(filter);
       filter.connect(filter.gainNode);
       filter.gainNode.connect(filter.analyser);
@@ -904,6 +923,27 @@ ThreeAudio.Source.prototype = {
         det.analyse();
       });
     }
+
+    return this;
+  },
+
+  size: function () {
+    return this.analyser.frequencyBinCount;
+  },
+
+  mic: function (callback) {
+    var c = this.context, inaudible = this.inaudible;
+    try {
+      navigator.webkitGetUserMedia({
+          audio: true
+        }, function (stream) {
+          // Create an AudioNode from the stream.
+          var mediaStreamSource = this.mediaStreamSource = c.createMediaStreamSource(stream);
+          mediaStreamSource.connect(inaudible);
+
+          callback && callback();
+        });
+    } catch (e) { };
 
     return this;
   },
@@ -954,12 +994,17 @@ ThreeAudio.Source.prototype = {
   },
 
   _play: function () {
+    this.startTime = (+new Date() / 1000) - this.element.currentTime;
     this.element.play();
   },
 
   _stop: function () {
     this.element.pause();
-  }//,
+  },
+
+  time: function () {
+    return this.startTime ? ((+new Date() / 1000) - this.startTime) : 0;
+  },
 
 };
 
@@ -975,32 +1020,32 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   uniforms = _.extend(uniforms || {}, {
     audioIsBeat: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioWasBeat: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioLevels: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioLevelsSmooth: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioLevelsChange: {
       type: 'fv1',
-      value: [0,0,0,0]//,
+      value: [0,0,0,0],
     },
     audioOffset: {
       type: 'f',
-      value: 0//,
+      value: 0,
     },
     audioStep: {
       type: 'v2',
-      value: { x: 0, y: 0 }//,
-    }//,
+      value: { x: 0, y: 0 },
+    },
   });
 
   // Generate uniforms for freq/time textures
@@ -1014,7 +1059,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
       THREE.ClampToEdgeWrapping,
       THREE.RepeatWrapping,
       THREE.NearestFilter,
-      THREE.NearestFilter//,
+      THREE.NearestFilter
     );
 
     // Pre-init texture to trick WebGLRenderer
@@ -1023,7 +1068,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
 
     uniforms[key + 'Data'] = {
       type: 't',
-      value: textureObject//,
+      value: textureObject,
     };
   });
 
@@ -1031,7 +1076,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
   _.each(textures || [], function (texture, key) {
     uniforms[key] = {
       type: 't',
-      value: ThreeAudio.toTexture(texture)//,
+      value: ThreeAudio.toTexture(texture),
     };
   });
 
@@ -1048,7 +1093,7 @@ ThreeAudio.Material = function (audioTextures, vertexShader, fragmentShader, tex
     attributes:     attributes,
     uniforms:       uniforms,
     vertexShader:   ThreeAudio.getShader(vertexShader),
-    fragmentShader: ThreeAudio.getShader(fragmentShader)//,
+    fragmentShader: ThreeAudio.getShader(fragmentShader),
   });
 };
 ThreeAudio.Textures = function (renderer, source, history) {
@@ -1136,18 +1181,18 @@ ThreeAudio.Textures.prototype = {
     var levels = this.data.levels,
         beat = this.data.beat;
     return {
-      audioIsBeat:       beat && beat.is,
-      audioWasBeat:      beat && beat.was, 
-      audioLevels:       levels && levels.direct,
-      audioLevelsSmooth: levels && levels.smooth,
-      audioLevelsChange: levels && levels.change,
+      audioIsBeat:       beat && beat.is || 0,
+      audioWasBeat:      beat && beat.was || 0, 
+      audioLevels:       levels && levels.direct || 0,
+      audioLevelsSmooth: levels && levels.smooth || 0,
+      audioLevelsChange: levels && levels.change || 0,
       audioOffset:       this.timeIndex / this.history,
       audioStep: {
         x: 1 / (this.source.samples - 1),
-        y: 1 / this.history//,
-      }//,
+        y: 1 / this.history,
+      },
     };
-  }//,
+  },
 }
 
 // Event emitter
@@ -1193,7 +1238,7 @@ ThreeAudio.LevelDetect = function (data) {
   data.levels = {
     direct: this.levels[0],
     smooth: this.smooth,
-    change: this.change//,
+    change: this.change,
   };
 };
 
@@ -1296,7 +1341,7 @@ ThreeAudio.BeatDetect = function (data) {
     is: false,
     was: 0,
     stddev: 0,
-    bpm: 0//,
+    bpm: 0,
   };
 
   __taDebug && this.initDebug();
@@ -1346,6 +1391,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.c.style.position = 'absolute';
     this.c.style.zIndex = 20;
     this.c.style.marginTop = '70px';
+    this.c.style.top = 0;
     this.g = this.c.getContext('2d');
     this.i = 0;
 
@@ -1359,6 +1405,7 @@ ThreeAudio.BeatDetect.prototype = {
     this.t.style.position = 'absolute';
     this.t.style.zIndex = 20;
     this.t.style.marginTop = '350px';
+    this.c.style.top = 0;
 
     document.body.appendChild(this.c);
     document.body.appendChild(this.t);
@@ -1510,7 +1557,7 @@ ThreeAudio.BeatDetect.prototype = {
             strength: 0,
             permanence: 0,
             score: 0,
-            window: 0//,
+            window: 0,
           };
           histogramSorted.push(peak);
         }
@@ -2016,7 +2063,7 @@ tQuery.registerStatic('createAudioMaterial',
       fragmentShader,
       textures,
       uniforms,
-      attributes//,
+      attributes
     );
 
     // Add .grid() method.

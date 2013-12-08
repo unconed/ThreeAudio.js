@@ -5,7 +5,7 @@
   }
 })({
   'THREE': 'Three.js',
-  'MicroEvent': 'MicroEvent.js'//,
+  'MicroEvent': 'MicroEvent.js',
 });
 
 // Namespace
