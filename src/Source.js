@@ -8,6 +8,7 @@ ThreeAudio.Source = function (options) {
   }, options);
 
   this.fftSize = options.fftSize;
+  this.detectors = options.detectors;
 
   this.filters = {};
   this.playing = false;
