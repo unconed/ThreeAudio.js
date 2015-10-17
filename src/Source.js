@@ -52,8 +52,8 @@ ThreeAudio.Source.prototype = {
     };
 
     // Create audible/inaudible inputs for analysis
-    this.audible = c.createDelayNode();
-    this.inaudible = c.createDelayNode();
+    this.audible = c.createDelay();
+    this.inaudible = c.createDelay();
 
     // Wait for audio metadata before initializing analyzer
     if (this.element.readyState >= 3) {
@@ -111,18 +111,18 @@ ThreeAudio.Source.prototype = {
       filter.analyser.fftSize = fftSize;
 
       // Create delay node to compensate for FFT lag.
-      filter.delayNode = c.createDelayNode();
+      filter.delayNode = c.createDelay();
       filter.delayNode.delayTime.value = 0;
 
       // Create gain node to offset filter loss.
-      filter.gainNode = c.createGainNode();
+      filter.gainNode = c.createGain();
       filter.gainNode.gain.value = spec.gain;
 
       filters[key] = filter;
     });
 
     // Create playback delay to compensate for FFT lag.
-    this.delay = c.createDelayNode();
+    this.delay = c.createDelay();
     this.processingDelay = this.fftSize * 2 / c.sampleRate;
     this.delay.delayTime.value = this.processingDelay;
 
